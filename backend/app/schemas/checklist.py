@@ -60,3 +60,22 @@ class ChecklistCompletionResponse(BaseModel):
     completed_at: datetime
     hold_point_verified_by: str | None
     hold_point_verified_at: datetime | None
+
+
+class HoldPointVerify(BaseModel):
+    verified_by: str
+
+
+class PhaseStatus(BaseModel):
+    total: int
+    completed: int
+    complete: bool
+
+
+class ExecutionStatusResponse(BaseModel):
+    current_phase: str | None
+    total_items: int
+    completed_items: int
+    next_item_id: str | None
+    all_complete: bool
+    phases: dict[str, PhaseStatus]

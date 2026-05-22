@@ -14,13 +14,18 @@ from app.schemas.changes import (
     ChangeUpdate,
 )
 from app.schemas.checklist import (
+    ChecklistCompletionCreate,
+    ChecklistCompletionResponse,
     ChecklistItemCreate,
     ChecklistItemResponse,
     ChecklistItemUpdate,
     ChecklistReorder,
+    ExecutionStatusResponse,
+    HoldPointVerify,
 )
 from app.schemas.reviews import ReviewDecisionSubmit, ReviewerAssign, ReviewResponse
 from app.services import changes as change_service
+from app.services import execution as execution_service
 from app.services import reviews as review_service
 
 router = APIRouter(prefix="/changes", tags=["changes"])
@@ -246,6 +251,81 @@ def delete_checklist_item(
 
     change_service.delete_checklist_item(db, item)
     return Response(status_code=204)
+
+
+# --- Execution ---
+
+
+@router.post(
+    "/{change_id}/checklist/{item_id}/complete",
+    response_model=ChecklistCompletionResponse,
+)
+def complete_checklist_item(
+    change_id: uuid.UUID,
+    item_id: uuid.UUID,
+    payload: ChecklistCompletionCreate,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+
+    item = change_service.get_checklist_item(db, change_id, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+
+    try:
+        completion = execution_service.complete_item(
+            db, change, item, payload.observed_result, payload.status, payload.completed_by
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return completion
+
+
+@router.post(
+    "/{change_id}/checklist/{item_id}/hold-point-verify",
+    response_model=ChecklistCompletionResponse,
+)
+def verify_hold_point(
+    change_id: uuid.UUID,
+    item_id: uuid.UUID,
+    payload: HoldPointVerify,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+
+    item = change_service.get_checklist_item(db, change_id, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+
+    try:
+        completion = execution_service.verify_hold_point(
+            db, change, item, payload.verified_by
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return completion
+
+
+@router.get(
+    "/{change_id}/execution-status",
+    response_model=ExecutionStatusResponse,
+)
+def get_execution_status(
+    change_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+
+    try:
+        return execution_service.get_execution_status(db, change)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 # --- Reviews ---
