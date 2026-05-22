@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
@@ -13,7 +13,12 @@ from app.schemas.changes import (
     ChangeResponse,
     ChangeUpdate,
 )
-from app.schemas.checklist import ChecklistItemCreate, ChecklistItemResponse
+from app.schemas.checklist import (
+    ChecklistItemCreate,
+    ChecklistItemResponse,
+    ChecklistItemUpdate,
+    ChecklistReorder,
+)
 from app.services import changes as change_service
 
 router = APIRouter(prefix="/changes", tags=["changes"])
@@ -139,3 +144,103 @@ def list_checklist_items(
 
     items = change_service.list_checklist_items(db, change_id, phase)
     return items
+
+
+@router.put(
+    "/{change_id}/checklist/reorder",
+    response_model=list[ChecklistItemResponse],
+)
+def reorder_checklist_items(
+    change_id: uuid.UUID,
+    payload: ChecklistReorder,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+    if change.status != ChangeStatus.DRAFT:
+        raise HTTPException(
+            status_code=422,
+            detail="Can only reorder checklist items on changes in draft status",
+        )
+
+    try:
+        items = change_service.reorder_checklist_items(
+            db, change_id, payload.phase, payload.item_ids
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return items
+
+
+@router.get(
+    "/{change_id}/checklist/{item_id}",
+    response_model=ChecklistItemResponse,
+)
+def get_checklist_item(
+    change_id: uuid.UUID,
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+
+    item = change_service.get_checklist_item(db, change_id, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+    return item
+
+
+@router.patch(
+    "/{change_id}/checklist/{item_id}",
+    response_model=ChecklistItemResponse,
+)
+def update_checklist_item(
+    change_id: uuid.UUID,
+    item_id: uuid.UUID,
+    payload: ChecklistItemUpdate,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+    if change.status != ChangeStatus.DRAFT:
+        raise HTTPException(
+            status_code=422,
+            detail="Can only update checklist items on changes in draft status",
+        )
+
+    item = change_service.get_checklist_item(db, change_id, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+
+    data = payload.model_dump(exclude_unset=True)
+    item = change_service.update_checklist_item(db, item, data)
+    return item
+
+
+@router.delete(
+    "/{change_id}/checklist/{item_id}",
+    status_code=204,
+)
+def delete_checklist_item(
+    change_id: uuid.UUID,
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+    if change.status != ChangeStatus.DRAFT:
+        raise HTTPException(
+            status_code=422,
+            detail="Can only delete checklist items on changes in draft status",
+        )
+
+    item = change_service.get_checklist_item(db, change_id, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Checklist item not found")
+
+    change_service.delete_checklist_item(db, item)
+    return Response(status_code=204)

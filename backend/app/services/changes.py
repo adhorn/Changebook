@@ -154,6 +154,24 @@ def add_checklist_item(
     return item
 
 
+def get_checklist_item(
+    db: Session, change_id: uuid.UUID, item_id: uuid.UUID
+) -> ChecklistItem | None:
+    return (
+        db.query(ChecklistItem)
+        .filter(ChecklistItem.id == item_id, ChecklistItem.change_id == change_id)
+        .first()
+    )
+
+
+# Logical phase order for sorting (not alphabetical)
+PHASE_ORDER = {
+    ChecklistPhase.PRE_FLIGHT: 0,
+    ChecklistPhase.EXECUTION: 1,
+    ChecklistPhase.VERIFICATION: 2,
+}
+
+
 def list_checklist_items(
     db: Session,
     change_id: uuid.UUID,
@@ -162,7 +180,74 @@ def list_checklist_items(
     query = db.query(ChecklistItem).filter(ChecklistItem.change_id == change_id)
     if phase:
         query = query.filter(ChecklistItem.phase == phase)
-    return query.order_by(ChecklistItem.phase, ChecklistItem.order).all()
+    items = query.order_by(ChecklistItem.order).all()
+    # Sort by logical phase order, then by item order within phase
+    items.sort(key=lambda i: (PHASE_ORDER.get(i.phase, 99), i.order))
+    return items
+
+
+def update_checklist_item(
+    db: Session, item: ChecklistItem, data: dict
+) -> ChecklistItem:
+    for key, value in data.items():
+        if value is not None:
+            setattr(item, key, value)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def delete_checklist_item(db: Session, item: ChecklistItem) -> None:
+    change_id = item.change_id
+    phase = item.phase
+    db.delete(item)
+    db.flush()
+
+    # Recompact ordering for remaining items in the same phase
+    remaining = (
+        db.query(ChecklistItem)
+        .filter(
+            ChecklistItem.change_id == change_id,
+            ChecklistItem.phase == phase,
+        )
+        .order_by(ChecklistItem.order)
+        .all()
+    )
+    for i, remaining_item in enumerate(remaining, start=1):
+        remaining_item.order = i
+
+    db.commit()
+
+
+def reorder_checklist_items(
+    db: Session,
+    change_id: uuid.UUID,
+    phase: ChecklistPhase,
+    item_ids: list[uuid.UUID],
+) -> list[ChecklistItem]:
+    existing = (
+        db.query(ChecklistItem)
+        .filter(
+            ChecklistItem.change_id == change_id,
+            ChecklistItem.phase == phase,
+        )
+        .all()
+    )
+    existing_ids = {item.id for item in existing}
+    requested_ids = set(item_ids)
+
+    if existing_ids != requested_ids:
+        raise ValueError(
+            f"Reorder must include all {len(existing_ids)} items for phase "
+            f"'{phase.value}'. Got {len(requested_ids)}."
+        )
+
+    id_to_item = {item.id: item for item in existing}
+    for new_order, item_id in enumerate(item_ids, start=1):
+        id_to_item[item_id].order = new_order
+
+    db.commit()
+    return list_checklist_items(db, change_id, phase)
 
 
 # Valid state transitions

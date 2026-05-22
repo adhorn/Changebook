@@ -30,6 +30,19 @@ class ChecklistItemResponse(BaseModel):
     created_at: datetime
 
 
+class ChecklistItemUpdate(BaseModel):
+    description: str | None = None
+    command: str | None = None
+    expected_outcome: str | None = None
+    rollback_action: str | None = None
+    is_hold_point: bool | None = None
+
+
+class ChecklistReorder(BaseModel):
+    phase: ChecklistPhase
+    item_ids: list[uuid.UUID]
+
+
 class ChecklistCompletionCreate(BaseModel):
     observed_result: str
     status: CompletionStatus
