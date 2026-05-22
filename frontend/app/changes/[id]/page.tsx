@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   api,
@@ -418,6 +418,7 @@ function ReviewCard({
 
 export default function ChangeDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
 
   const [change, setChange] = useState<Change | null>(null);
@@ -432,6 +433,10 @@ export default function ChangeDetailPage() {
   const [transitioning, setTransitioning] = useState(false);
   const [newReviewer, setNewReviewer] = useState("");
   const [preflightExpanded, setPreflightExpanded] = useState(false);
+  const [showDuplicate, setShowDuplicate] = useState(false);
+  const [dupAuthor, setDupAuthor] = useState("");
+  const [dupTitle, setDupTitle] = useState("");
+  const [duplicating, setDuplicating] = useState(false);
 
   // New checklist item form
   const [showAddItem, setShowAddItem] = useState(false);
@@ -518,6 +523,40 @@ export default function ChangeDetailPage() {
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed");
+    }
+  }
+
+  async function handleDuplicate() {
+    if (!dupAuthor.trim()) return;
+    setDuplicating(true);
+    setError(null);
+    try {
+      const clone = await api.duplicateChange(id, {
+        author_name: dupAuthor.trim(),
+        title: dupTitle.trim() || undefined,
+      });
+      router.push(`/changes/${clone.id}`);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to duplicate");
+      setDuplicating(false);
+    }
+  }
+
+  async function handleExport() {
+    setError(null);
+    try {
+      const md = await api.exportMarkdown(id);
+      const blob = new Blob([md], { type: "text/markdown" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${change?.title || "change"}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to export");
     }
   }
 
@@ -647,6 +686,21 @@ export default function ChangeDetailPage() {
               )}
             </div>
             <div className="flex gap-2">
+              <button
+                onClick={handleExport}
+                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Export
+              </button>
+              <button
+                onClick={() => {
+                  setDupTitle(`${change.title} (copy)`);
+                  setShowDuplicate(true);
+                }}
+                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Duplicate
+              </button>
               {!isTerminal && (
                 <button
                   onClick={() => handleTransition("aborted")}
@@ -681,6 +735,63 @@ export default function ChangeDetailPage() {
             >
               dismiss
             </button>
+          </div>
+        )}
+
+        {/* Duplicate form */}
+        {showDuplicate && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
+            <h2 className="text-sm font-medium text-gray-900">
+              Duplicate this change
+            </h2>
+            <p className="text-xs text-gray-500">
+              Creates a copy with the same pre-flight answers, checklist, and
+              defence tags. Status resets to Draft.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={dupTitle}
+                  onChange={(e) => setDupTitle(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Author name *
+                </label>
+                <input
+                  type="text"
+                  value={dupAuthor}
+                  onChange={(e) => setDupAuthor(e.target.value)}
+                  placeholder="Your name"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleDuplicate();
+                  }}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleDuplicate}
+                disabled={!dupAuthor.trim() || duplicating}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+              >
+                {duplicating ? "Duplicating..." : "Create Duplicate"}
+              </button>
+              <button
+                onClick={() => setShowDuplicate(false)}
+                className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
