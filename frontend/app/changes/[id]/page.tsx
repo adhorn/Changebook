@@ -433,6 +433,9 @@ export default function ChangeDetailPage() {
   const [transitioning, setTransitioning] = useState(false);
   const [newReviewer, setNewReviewer] = useState("");
   const [preflightExpanded, setPreflightExpanded] = useState(false);
+  const [preflightEditing, setPreflightEditing] = useState(false);
+  const [editedAnswers, setEditedAnswers] = useState<Record<string, string>>({});
+  const [savingPreflight, setSavingPreflight] = useState(false);
   const [showDuplicate, setShowDuplicate] = useState(false);
   const [dupAuthor, setDupAuthor] = useState("");
   const [dupTitle, setDupTitle] = useState("");
@@ -524,6 +527,31 @@ export default function ChangeDetailPage() {
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed");
     }
+  }
+
+  function startEditingPreflight() {
+    setEditedAnswers({ ...(change?.preflight_answers || {}) });
+    setPreflightEditing(true);
+    setPreflightExpanded(true);
+  }
+
+  function updateEditedAnswer(key: string, value: string) {
+    setEditedAnswers((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSavePreflight() {
+    setSavingPreflight(true);
+    setError(null);
+    try {
+      await api.updateChange(id, {
+        preflight_answers: editedAnswers,
+      });
+      setPreflightEditing(false);
+      await loadAll();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save pre-flight answers");
+    }
+    setSavingPreflight(false);
   }
 
   async function handleDuplicate() {
@@ -844,30 +872,39 @@ export default function ChangeDetailPage() {
           </div>
         )}
 
-        {/* Pre-flight answers — collapsible, grouped by section */}
-        {hasPreflightAnswers && (
+        {/* Pre-flight answers — collapsible, grouped by section, editable in draft */}
+        {(hasPreflightAnswers || (isDraft && preflightSections.length > 0)) && (
           <div className="bg-white rounded-lg border border-gray-200">
-            <button
-              onClick={() => setPreflightExpanded(!preflightExpanded)}
-              className="w-full flex items-center justify-between p-6 text-left hover:bg-gray-50 transition-colors"
-            >
-              <div>
-                <h2 className="text-lg font-medium text-gray-900">
-                  Pre-flight Answers
-                </h2>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  {answeredCount} questions answered
-                </p>
-              </div>
-              <span className="text-gray-400 text-lg">
-                {preflightExpanded ? "▾" : "▸"}
-              </span>
-            </button>
+            <div className="flex items-center justify-between p-6">
+              <button
+                onClick={() => setPreflightExpanded(!preflightExpanded)}
+                className="flex-1 flex items-center justify-between text-left hover:opacity-80 transition-opacity"
+              >
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900">
+                    Pre-flight Answers
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    {answeredCount} questions answered
+                  </p>
+                </div>
+                <span className="text-gray-400 text-lg">
+                  {preflightExpanded ? "▾" : "▸"}
+                </span>
+              </button>
+              {isDraft && !preflightEditing && (
+                <button
+                  onClick={startEditingPreflight}
+                  className="ml-4 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
 
-            {preflightExpanded && (
+            {preflightExpanded && !preflightEditing && (
               <div className="px-6 pb-6 space-y-6 border-t border-gray-100 pt-4">
                 {preflightSections.map((section) => {
-                  // Only show sections that have at least one answered question
                   const answeredQuestions = section.questions.filter(
                     (q) => change.preflight_answers?.[q.key]
                   );
@@ -897,7 +934,7 @@ export default function ChangeDetailPage() {
                   );
                 })}
 
-                {/* Show any answers that aren't in the schema (orphaned keys) */}
+                {/* Orphaned keys not in current schema */}
                 {(() => {
                   const schemaKeys = new Set(
                     preflightSections.flatMap((s) =>
@@ -905,7 +942,7 @@ export default function ChangeDetailPage() {
                     )
                   );
                   const orphanedEntries = Object.entries(
-                    change.preflight_answers!
+                    change.preflight_answers || {}
                   ).filter(([key]) => !schemaKeys.has(key));
                   if (orphanedEntries.length === 0) return null;
                   return (
@@ -932,6 +969,62 @@ export default function ChangeDetailPage() {
                     </div>
                   );
                 })()}
+              </div>
+            )}
+
+            {/* Edit mode — show all questions as textareas */}
+            {preflightExpanded && preflightEditing && (
+              <div className="px-6 pb-6 space-y-6 border-t border-gray-100 pt-4">
+                {preflightSections.map((section) => (
+                  <div key={section.title}>
+                    <h3 className="text-sm font-medium text-gray-900 mb-1">
+                      {section.title}
+                    </h3>
+                    <p className="text-xs text-gray-400 italic mb-3">
+                      {section.framing}
+                    </p>
+                    <div className="space-y-3">
+                      {section.questions.map((q) => (
+                        <div key={q.key}>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">
+                            {q.label}
+                            {q.required && (
+                              <span className="text-red-500 ml-0.5">*</span>
+                            )}
+                          </label>
+                          <p className="text-xs text-gray-400 mb-1">
+                            {q.description}
+                          </p>
+                          <textarea
+                            value={editedAnswers[q.key] || ""}
+                            onChange={(e) =>
+                              updateEditedAnswer(q.key, e.target.value)
+                            }
+                            rows={2}
+                            placeholder={q.example}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex gap-2 pt-2 border-t border-gray-100">
+                  <button
+                    onClick={handleSavePreflight}
+                    disabled={savingPreflight}
+                    className="px-4 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {savingPreflight ? "Saving..." : "Save Answers"}
+                  </button>
+                  <button
+                    onClick={() => setPreflightEditing(false)}
+                    className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             )}
           </div>
