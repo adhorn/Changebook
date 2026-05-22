@@ -27,6 +27,7 @@ from app.schemas.checklist import (
 from app.schemas.reviews import ReviewDecisionSubmit, ReviewerAssign, ReviewResponse
 from app.services import changes as change_service
 from app.services import execution as execution_service
+from app.services import export as export_service
 from app.services import reviews as review_service
 
 router = APIRouter(prefix="/changes", tags=["changes"])
@@ -89,6 +90,19 @@ def duplicate_change(
     overrides = payload.model_dump(exclude={"author_name"}, exclude_unset=True)
     clone = change_service.duplicate_change(db, source, overrides, payload.author_name)
     return clone
+
+
+@router.get("/{change_id}/export/markdown")
+def export_markdown(
+    change_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+
+    md = export_service.render_markdown(db, change)
+    return Response(content=md, media_type="text/markdown; charset=utf-8")
 
 
 @router.patch("/{change_id}", response_model=ChangeDetailResponse)
