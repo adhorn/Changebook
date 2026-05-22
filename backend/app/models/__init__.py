@@ -10,7 +10,7 @@ from app.models.checklist import (
 from app.models.customer import Customer, Service
 from app.models.environment import Environment
 from app.models.organisation import Organisation
-from app.models.preflight import PreflightAnswer
+from app.models.preflight import PREFLIGHT_SCHEMA_VERSION, get_preflight_schema
 from app.models.review import Review, ReviewDecision
 
 __all__ = [
@@ -26,7 +26,8 @@ __all__ = [
     "ChecklistPhase",
     "ChecklistCompletion",
     "CompletionStatus",
-    "PreflightAnswer",
+    "PREFLIGHT_SCHEMA_VERSION",
+    "get_preflight_schema",
     "Review",
     "ReviewDecision",
     "AuditEvent",

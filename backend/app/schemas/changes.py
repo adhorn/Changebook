@@ -71,6 +71,7 @@ class ChangeResponse(BaseModel):
     environment_id: uuid.UUID
     author_name: str
     preflight_answers: dict | None
+    preflight_schema_version: str | None
     defence_tags: list[str] | None
     cloned_from: uuid.UUID | None
     created_at: datetime

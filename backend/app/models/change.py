@@ -57,6 +57,9 @@ class Change(UUIDMixin, TimestampMixin, Base):
     # Pre-flight answers stored as JSONB for flexibility
     preflight_answers: Mapped[dict | None] = mapped_column(PortableJSON, nullable=True)
 
+    # Tracks which version of the question schema the answers were written against
+    preflight_schema_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     # Defence tags — validated against ALLOWED_DEFENCE_TAGS
     defence_tags: Mapped[list | None] = mapped_column(PortableJSON, nullable=True)
 
