@@ -87,3 +87,20 @@ class Change(UUIDMixin, TimestampMixin, Base):
     audit_events: Mapped[list["AuditEvent"]] = relationship(  # noqa: F821
         back_populates="change"
     )
+
+    # Derived properties for response serialisation
+    @property
+    def customer_name(self) -> str | None:
+        return self.customer.name if self.customer else None
+
+    @property
+    def service_name(self) -> str | None:
+        return self.service.name if self.service else None
+
+    @property
+    def environment_name(self) -> str | None:
+        return self.environment.name if self.environment else None
+
+    @property
+    def environment_platform(self) -> str | None:
+        return self.environment.platform if self.environment else None

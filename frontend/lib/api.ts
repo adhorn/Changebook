@@ -51,6 +51,10 @@ export interface Change {
   created_at: string;
   updated_at: string;
   audit_event_count?: number;
+  customer_name: string | null;
+  service_name: string | null;
+  environment_name: string | null;
+  environment_platform: string | null;
 }
 
 export interface ChangeListResponse {

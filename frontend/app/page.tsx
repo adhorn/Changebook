@@ -170,9 +170,12 @@ export default function Home() {
                         <div className="text-sm font-medium text-gray-900">
                           {change.title}
                         </div>
-                        {change.description && (
-                          <div className="text-sm text-gray-500 truncate max-w-md">
-                            {change.description}
+                        {(change.customer_name || change.environment_name) && (
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            {[change.customer_name, change.service_name].filter(Boolean).join(" / ")}
+                            {change.environment_name && (
+                              <> → <span className="text-gray-500 font-medium">{change.environment_name}</span></>
+                            )}
                           </div>
                         )}
                         {change.defence_tags && change.defence_tags.length > 0 && (

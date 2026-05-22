@@ -86,6 +86,12 @@ class ChangeResponse(BaseModel):
     updated_at: datetime
     audit_event_count: int | None = None
 
+    # Denormalised names from relationships
+    customer_name: str | None = None
+    service_name: str | None = None
+    environment_name: str | None = None
+    environment_platform: str | None = None
+
 
 class ChangeDetailResponse(ChangeResponse):
     pass  # Will add checklist_items here in Feature 3

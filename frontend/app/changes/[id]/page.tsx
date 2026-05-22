@@ -619,6 +619,32 @@ export default function ChangeDetailPage() {
                   {formatDate(change.created_at)}
                 </span>
               </div>
+              {(change.customer_name || change.environment_name) && (
+                <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500">
+                  {change.customer_name && (
+                    <span>{change.customer_name}</span>
+                  )}
+                  {change.service_name && (
+                    <>
+                      <span className="text-gray-300">/</span>
+                      <span>{change.service_name}</span>
+                    </>
+                  )}
+                  {change.environment_name && (
+                    <>
+                      <span className="text-gray-300">→</span>
+                      <span className="font-medium text-gray-700">
+                        {change.environment_name}
+                      </span>
+                      {change.environment_platform && (
+                        <span className="text-xs text-gray-400">
+                          ({change.environment_platform})
+                        </span>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex gap-2">
               {!isTerminal && (

@@ -35,7 +35,18 @@ def create_change(db: Session, data: dict) -> Change:
 
 
 def get_change(db: Session, change_id: uuid.UUID) -> Change | None:
-    return db.query(Change).filter(Change.id == change_id).first()
+    from sqlalchemy.orm import joinedload
+
+    return (
+        db.query(Change)
+        .options(
+            joinedload(Change.customer),
+            joinedload(Change.service),
+            joinedload(Change.environment),
+        )
+        .filter(Change.id == change_id)
+        .first()
+    )
 
 
 def list_changes(
@@ -53,7 +64,13 @@ def list_changes(
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Change], int]:
-    query = db.query(Change)
+    from sqlalchemy.orm import joinedload
+
+    query = db.query(Change).options(
+        joinedload(Change.customer),
+        joinedload(Change.service),
+        joinedload(Change.environment),
+    )
 
     if customer_id:
         query = query.filter(Change.customer_id == customer_id)
