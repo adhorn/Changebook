@@ -43,6 +43,18 @@ def _add_items_to_all_phases(client, change_id):
         )
 
 
+def _approve_change(client, change_id):
+    """Assign a reviewer and approve."""
+    review = client.post(
+        f"/api/v1/changes/{change_id}/reviewers",
+        json={"reviewer_name": "Reviewer"},
+    )
+    client.post(
+        f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
+        json={"decision": "approved"},
+    )
+
+
 class TestCompletenessGate:
     """Cannot submit for review unless all three phases have checklist items."""
 
@@ -131,7 +143,17 @@ class TestFullLifecycleWithGates:
         change_id = _create_change_with_preflight(client, sample_change_data)
         _add_items_to_all_phases(client, change_id)
 
-        for status in ["in_review", "approved", "executing", "done"]:
+        # Submit for review
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+        )
+        assert resp.status_code == 200
+
+        # Approve (requires reviewer)
+        _approve_change(client, change_id)
+
+        for status in ["approved", "executing", "done"]:
             resp = client.post(
                 f"/api/v1/changes/{change_id}/transition",
                 params={"target_status": status, "actor_name": "Adrian Hornsby"},
@@ -179,7 +201,12 @@ class TestStalenessWarning:
         change_id = _create_change_with_preflight(client, sample_change_data)
         _add_items_to_all_phases(client, change_id)
 
-        for status in ["in_review", "approved", "executing"]:
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+        )
+        _approve_change(client, change_id)
+        for status in ["approved", "executing"]:
             client.post(
                 f"/api/v1/changes/{change_id}/transition",
                 params={"target_status": status, "actor_name": "Adrian Hornsby"},
@@ -197,11 +224,15 @@ class TestStalenessWarning:
         _add_items_to_all_phases(client, change_id)
 
         # Move to approved
-        for status in ["in_review", "approved"]:
-            client.post(
-                f"/api/v1/changes/{change_id}/transition",
-                params={"target_status": status, "actor_name": "Adrian Hornsby"},
-            )
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+        )
+        _approve_change(client, change_id)
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+        )
 
         # Backdate the preflight_answered_at to 48h ago
         from app.models.change import Change
@@ -239,11 +270,15 @@ class TestStalenessWarning:
         change_id = _create_change_with_preflight(client, sample_change_data)
         _add_items_to_all_phases(client, change_id)
 
-        for status in ["in_review", "approved"]:
-            client.post(
-                f"/api/v1/changes/{change_id}/transition",
-                params={"target_status": status, "actor_name": "Adrian Hornsby"},
-            )
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+        )
+        _approve_change(client, change_id)
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+        )
 
         from app.models.change import Change
 

@@ -132,6 +132,17 @@ class TestStateTransitions:
                 json={"phase": phase, "description": f"{phase} step"},
             )
 
+    def _approve_change(self, client, change_id):
+        """Assign a reviewer and approve so the change can transition to approved."""
+        review = client.post(
+            f"/api/v1/changes/{change_id}/reviewers",
+            json={"reviewer_name": "Reviewer"},
+        )
+        client.post(
+            f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
+            json={"decision": "approved"},
+        )
+
     def _create_change(self, client, sample_change_data, ready_for_review=False):
         data = {
             "title": "Test change",
@@ -168,8 +179,15 @@ class TestStateTransitions:
         """A change can go through the full lifecycle."""
         change_id = self._create_change(client, sample_change_data, ready_for_review=True)
 
-        transitions = ["in_review", "approved", "executing", "done"]
-        for status in transitions:
+        # Submit for review
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+        )
+        # Approve (requires reviewer)
+        self._approve_change(client, change_id)
+
+        for status in ["approved", "executing", "done"]:
             resp = client.post(
                 f"/api/v1/changes/{change_id}/transition",
                 params={"target_status": status, "actor_name": "Adrian Hornsby"},
@@ -190,7 +208,12 @@ class TestStateTransitions:
     def test_done_is_terminal(self, client, sample_change_data):
         """Once done, a change cannot transition to any other state."""
         change_id = self._create_change(client, sample_change_data, ready_for_review=True)
-        for status in ["in_review", "approved", "executing", "done"]:
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+        )
+        self._approve_change(client, change_id)
+        for status in ["approved", "executing", "done"]:
             client.post(
                 f"/api/v1/changes/{change_id}/transition",
                 params={"target_status": status, "actor_name": "Adrian Hornsby"},

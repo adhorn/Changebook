@@ -19,7 +19,9 @@ from app.schemas.checklist import (
     ChecklistItemUpdate,
     ChecklistReorder,
 )
+from app.schemas.reviews import ReviewDecisionSubmit, ReviewerAssign, ReviewResponse
 from app.services import changes as change_service
+from app.services import reviews as review_service
 
 router = APIRouter(prefix="/changes", tags=["changes"])
 
@@ -244,3 +246,71 @@ def delete_checklist_item(
 
     change_service.delete_checklist_item(db, item)
     return Response(status_code=204)
+
+
+# --- Reviews ---
+
+
+@router.post(
+    "/{change_id}/reviewers",
+    response_model=ReviewResponse,
+    status_code=201,
+)
+def assign_reviewer(
+    change_id: uuid.UUID,
+    payload: ReviewerAssign,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+
+    try:
+        review = review_service.assign_reviewer(db, change_id, payload.reviewer_name)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    return review
+
+
+@router.get(
+    "/{change_id}/reviewers",
+    response_model=list[ReviewResponse],
+)
+def list_reviewers(
+    change_id: uuid.UUID,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+
+    return review_service.list_reviews(db, change_id)
+
+
+@router.post(
+    "/{change_id}/reviewers/{review_id}/decision",
+    response_model=ReviewResponse,
+)
+def submit_review_decision(
+    change_id: uuid.UUID,
+    review_id: uuid.UUID,
+    payload: ReviewDecisionSubmit,
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+    if change.status != ChangeStatus.IN_REVIEW:
+        raise HTTPException(
+            status_code=422,
+            detail="Reviews can only be submitted when the change is in_review",
+        )
+
+    review = review_service.get_review(db, change_id, review_id)
+    if not review:
+        raise HTTPException(status_code=404, detail="Review not found")
+
+    review = review_service.submit_decision(
+        db, review, payload.decision, payload.comment
+    )
+    return review

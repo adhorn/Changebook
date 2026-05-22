@@ -7,6 +7,7 @@ from app.models.audit import AuditEvent
 from app.models.change import Change, ChangeStatus
 from app.models.checklist import ChecklistItem, ChecklistPhase
 from app.models.preflight import PREFLIGHT_SCHEMA_VERSION, validate_preflight_completeness
+from app.models.review import Review, ReviewDecision
 
 STALENESS_THRESHOLD = timedelta(hours=24)
 
@@ -87,6 +88,9 @@ def update_change(db: Session, change: Change, data: dict, actor_name: str) -> C
         if value is not None:
             setattr(change, key, value)
 
+    # Integrity guarantee: any edit invalidates existing reviews
+    _invalidate_reviews_if_any(db, change.id)
+
     audit = AuditEvent(
         change_id=change.id,
         event_type="change_updated",
@@ -134,6 +138,26 @@ def transition_status(
             raise ValueError(
                 f"Cannot submit for review — checklist items required in all "
                 f"three phases. Missing: {sorted(p.value for p in missing_phases)}"
+            )
+
+    # Gate on transition to approved: all reviewers must have approved
+    if new_status == ChangeStatus.APPROVED:
+        reviews = (
+            db.query(Review).filter(Review.change_id == change.id).all()
+        )
+        if not reviews:
+            raise ValueError(
+                "Cannot approve — no reviewers assigned. "
+                "At least one reviewer must approve."
+            )
+        non_approved = [
+            r for r in reviews if r.decision != ReviewDecision.APPROVED
+        ]
+        if non_approved:
+            pending_names = [r.reviewer_name for r in non_approved]
+            raise ValueError(
+                f"Cannot approve — not all reviewers have approved. "
+                f"Outstanding: {pending_names}"
             )
 
     # Staleness warning on transition to executing
@@ -198,6 +222,7 @@ def add_checklist_item(
         **data,
     )
     db.add(item)
+    _invalidate_reviews_if_any(db, change_id)
     db.commit()
     db.refresh(item)
     return item
@@ -241,6 +266,7 @@ def update_checklist_item(
     for key, value in data.items():
         if value is not None:
             setattr(item, key, value)
+    _invalidate_reviews_if_any(db, item.change_id)
     db.commit()
     db.refresh(item)
     return item
@@ -249,6 +275,7 @@ def update_checklist_item(
 def delete_checklist_item(db: Session, item: ChecklistItem) -> None:
     change_id = item.change_id
     phase = item.phase
+    _invalidate_reviews_if_any(db, change_id)
     db.delete(item)
     db.flush()
 
@@ -303,11 +330,33 @@ def reorder_checklist_items(
 VALID_TRANSITIONS = {
     ChangeStatus.DRAFT: {ChangeStatus.IN_REVIEW, ChangeStatus.ABORTED},
     ChangeStatus.IN_REVIEW: {ChangeStatus.APPROVED, ChangeStatus.DRAFT, ChangeStatus.ABORTED},
-    ChangeStatus.APPROVED: {ChangeStatus.EXECUTING, ChangeStatus.ABORTED},
+    ChangeStatus.APPROVED: {ChangeStatus.EXECUTING, ChangeStatus.DRAFT, ChangeStatus.ABORTED},
     ChangeStatus.EXECUTING: {ChangeStatus.DONE, ChangeStatus.ABORTED},
     ChangeStatus.DONE: set(),
     ChangeStatus.ABORTED: set(),
 }
+
+
+def _invalidate_reviews_if_any(db: Session, change_id: uuid.UUID) -> None:
+    """Reset all reviews to pending if any exist. Integrity guarantee."""
+    reviews = db.query(Review).filter(Review.change_id == change_id).all()
+    changed = False
+    for review in reviews:
+        if review.decision != ReviewDecision.PENDING:
+            review.decision = ReviewDecision.PENDING
+            review.comment = None
+            changed = True
+    if changed:
+        audit = AuditEvent(
+            change_id=change_id,
+            event_type="reviews_invalidated",
+            actor_name="system",
+            description="All reviews reset to pending due to change edit",
+            event_data={
+                "reviewers_affected": [r.reviewer_name for r in reviews],
+            },
+        )
+        db.add(audit)
 
 
 def _validate_transition(current: ChangeStatus, target: ChangeStatus) -> None:
