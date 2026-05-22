@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, String, Text, TypeDecorator, func
 from sqlalchemy.dialects.postgresql import JSONB as PG_JSONB
@@ -37,8 +37,25 @@ class PortableUUID(TypeDecorator):
         return value
 
 
+def _make_json_safe(value):
+    """Recursively convert non-JSON-serializable types (UUID, datetime) to strings."""
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, dict):
+        return {k: _make_json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_make_json_safe(v) for v in value]
+    return value
+
+
 class PortableJSON(TypeDecorator):
-    """JSON type that works on both Postgres (JSONB) and SQLite (TEXT)."""
+    """JSON type that works on both Postgres (JSONB) and SQLite (TEXT).
+
+    Automatically converts UUID and datetime objects to strings before
+    serialization, so JSONB columns can store lists of UUIDs etc.
+    """
 
     impl = Text
     cache_ok = True
@@ -51,6 +68,7 @@ class PortableJSON(TypeDecorator):
     def process_bind_param(self, value, dialect):
         if value is None:
             return value
+        value = _make_json_safe(value)
         if dialect.name == "postgresql":
             return value
         return json.dumps(value)
@@ -72,15 +90,15 @@ class Base(DeclarativeBase):
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         server_default=func.now(),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(UTC),
         server_default=func.now(),
-        onupdate=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(UTC),
         nullable=False,
     )
 

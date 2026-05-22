@@ -51,9 +51,7 @@ def create_team(payload: TeamCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/teams", response_model=list[TeamResponse])
-def list_teams(
-    organisation_id: uuid.UUID | None = None, db: Session = Depends(get_db)
-):
+def list_teams(organisation_id: uuid.UUID | None = None, db: Session = Depends(get_db)):
     query = db.query(Team)
     if organisation_id:
         query = query.filter(Team.organisation_id == organisation_id)
@@ -81,9 +79,7 @@ def create_environment(payload: EnvironmentCreate, db: Session = Depends(get_db)
 
 
 @router.get("/environments", response_model=list[EnvironmentResponse])
-def list_environments(
-    organisation_id: uuid.UUID | None = None, db: Session = Depends(get_db)
-):
+def list_environments(organisation_id: uuid.UUID | None = None, db: Session = Depends(get_db)):
     query = db.query(Environment)
     if organisation_id:
         query = query.filter(Environment.organisation_id == organisation_id)

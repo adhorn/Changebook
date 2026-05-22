@@ -56,9 +56,7 @@ def org_and_team(client):
     org = client.post("/api/v1/organisations", json={"name": "Test Org"})
     org_id = org.json()["id"]
 
-    team = client.post(
-        "/api/v1/teams", json={"name": "Platform Team", "organisation_id": org_id}
-    )
+    team = client.post("/api/v1/teams", json={"name": "Platform Team", "organisation_id": org_id})
     team_id = team.json()["id"]
 
     return {"org_id": org_id, "team_id": team_id}

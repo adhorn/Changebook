@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, PortableJSON, PortableUUID, TimestampMixin, UUIDMixin
 
 
-class StepStatus(str, enum.Enum):
+class StepStatus(enum.StrEnum):
     PENDING = "pending"
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
@@ -51,9 +51,7 @@ class StepCompletion(UUIDMixin, TimestampMixin, Base):
 
     __tablename__ = "step_completions"
 
-    step_id: Mapped[uuid.UUID] = mapped_column(
-        PortableUUID, ForeignKey("steps.id"), nullable=False
-    )
+    step_id: Mapped[uuid.UUID] = mapped_column(PortableUUID, ForeignKey("steps.id"), nullable=False)
     environment_id: Mapped[uuid.UUID | None] = mapped_column(
         PortableUUID, ForeignKey("environments.id"), nullable=True
     )
@@ -62,9 +60,7 @@ class StepCompletion(UUIDMixin, TimestampMixin, Base):
         Enum(StepStatus), default=StepStatus.PENDING, nullable=False
     )
     completed_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     evidence: Mapped[dict | None] = mapped_column(PortableJSON, nullable=True)
 

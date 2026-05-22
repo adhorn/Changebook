@@ -43,7 +43,9 @@ DEFAULT_PREFLIGHT_QUESTIONS = {
         {"key": "rollback_plan", "label": "How do you roll back?", "type": "text"},
         {
             "key": "rollback_duration",
-            "label": "How long does rollback take? What is the customer's experience during rollback?",
+            "label": (
+                "How long does rollback take? What is the customer's experience during rollback?"
+            ),
             "type": "text",
         },
         {

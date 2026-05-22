@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, PortableUUID, TimestampMixin, UUIDMixin
 
 
-class ReviewDecision(str, enum.Enum):
+class ReviewDecision(enum.StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
     CHANGES_REQUESTED = "changes_requested"

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.models.base import Base, PortableJSON, PortableUUID, TimestampMixin, UUIDMixin
 
 
-class ChangeStatus(str, enum.Enum):
+class ChangeStatus(enum.StrEnum):
     DRAFT = "draft"
     IN_REVIEW = "in_review"
     APPROVED = "approved"
@@ -29,9 +29,7 @@ class Change(UUIDMixin, TimestampMixin, Base):
     )
 
     # Ownership
-    team_id: Mapped[uuid.UUID] = mapped_column(
-        PortableUUID, ForeignKey("teams.id"), nullable=False
-    )
+    team_id: Mapped[uuid.UUID] = mapped_column(PortableUUID, ForeignKey("teams.id"), nullable=False)
     author_name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     # Environments targeted by this change (list of UUID strings as JSON)

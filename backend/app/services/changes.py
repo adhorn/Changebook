@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session, joinedload
 
@@ -33,12 +32,7 @@ def create_change(db: Session, data: dict) -> Change:
 
 
 def get_change(db: Session, change_id: uuid.UUID) -> Change | None:
-    return (
-        db.query(Change)
-        .options(joinedload(Change.steps))
-        .filter(Change.id == change_id)
-        .first()
-    )
+    return db.query(Change).options(joinedload(Change.steps)).filter(Change.id == change_id).first()
 
 
 def list_changes(

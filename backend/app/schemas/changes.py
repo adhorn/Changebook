@@ -5,7 +5,6 @@ from pydantic import BaseModel, ConfigDict
 
 from app.models.change import ChangeStatus
 
-
 # --- Request schemas ---
 
 

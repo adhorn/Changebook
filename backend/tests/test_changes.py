@@ -187,7 +187,7 @@ class TestStateTransitions:
         assert resp.status_code == 422
 
     def test_full_lifecycle(self, client, org_and_team):
-        """A change can go through the full lifecycle: draft → review → approved → executing → verifying → verified → closed."""
+        """A change can go through the full lifecycle."""
         change_id = self._create_change(client, org_and_team)
 
         transitions = [
@@ -219,7 +219,15 @@ class TestStateTransitions:
     def test_closed_is_terminal(self, client, org_and_team):
         """Once closed, a change cannot transition to any other state."""
         change_id = self._create_change(client, org_and_team)
-        for status in ["in_review", "approved", "executing", "awaiting_verification", "verified", "closed"]:
+        lifecycle = [
+            "in_review",
+            "approved",
+            "executing",
+            "awaiting_verification",
+            "verified",
+            "closed",
+        ]
+        for status in lifecycle:
             client.post(
                 f"/api/v1/changes/{change_id}/transition",
                 params={"target_status": status, "actor_name": "Adrian Hornsby"},
