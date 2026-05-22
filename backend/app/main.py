@@ -41,6 +41,16 @@ app.include_router(organisations_router, prefix="/api/v1")
 app.include_router(preflight_router, prefix="/api/v1")
 
 
+@app.on_event("startup")
+def create_tables():
+    from app.core.database import engine
+    from app.models.base import Base
+
+    import app.models  # noqa: F401 — ensure all models are imported
+
+    Base.metadata.create_all(bind=engine)
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}

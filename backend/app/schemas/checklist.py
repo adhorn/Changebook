@@ -15,6 +15,19 @@ class ChecklistItemCreate(BaseModel):
     is_hold_point: bool = False
 
 
+class ChecklistCompletionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    item_id: uuid.UUID
+    observed_result: str
+    status: CompletionStatus
+    completed_by: str
+    completed_at: datetime
+    hold_point_verified_by: str | None
+    hold_point_verified_at: datetime | None
+
+
 class ChecklistItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,6 +41,7 @@ class ChecklistItemResponse(BaseModel):
     rollback_action: str | None
     is_hold_point: bool
     created_at: datetime
+    completion: ChecklistCompletionResponse | None = None
 
 
 class ChecklistItemUpdate(BaseModel):
@@ -47,19 +61,6 @@ class ChecklistCompletionCreate(BaseModel):
     observed_result: str
     status: CompletionStatus
     completed_by: str
-
-
-class ChecklistCompletionResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    item_id: uuid.UUID
-    observed_result: str
-    status: CompletionStatus
-    completed_by: str
-    completed_at: datetime
-    hold_point_verified_by: str | None
-    hold_point_verified_at: datetime | None
 
 
 class HoldPointVerify(BaseModel):

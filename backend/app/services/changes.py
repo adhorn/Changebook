@@ -331,7 +331,13 @@ def list_checklist_items(
     change_id: uuid.UUID,
     phase: ChecklistPhase | None = None,
 ) -> list[ChecklistItem]:
-    query = db.query(ChecklistItem).filter(ChecklistItem.change_id == change_id)
+    from sqlalchemy.orm import joinedload
+
+    query = (
+        db.query(ChecklistItem)
+        .options(joinedload(ChecklistItem.completion))
+        .filter(ChecklistItem.change_id == change_id)
+    )
     if phase:
         query = query.filter(ChecklistItem.phase == phase)
     items = query.order_by(ChecklistItem.order).all()
