@@ -104,6 +104,66 @@ def update_change(db: Session, change: Change, data: dict, actor_name: str) -> C
     return change
 
 
+def duplicate_change(
+    db: Session, source: Change, overrides: dict, author_name: str
+) -> Change:
+    """Clone a change — same structure, fresh state.
+
+    Copies: title, description, preflight answers, defence tags, checklist items.
+    Resets: status to draft, no reviews, no completions.
+    """
+    title = overrides.get("title") or f"{source.title} (copy)"
+
+    clone = Change(
+        title=title,
+        description=source.description,
+        status=ChangeStatus.DRAFT,
+        customer_id=overrides.get("customer_id") or source.customer_id,
+        service_id=overrides.get("service_id") or source.service_id,
+        environment_id=overrides.get("environment_id") or source.environment_id,
+        author_name=author_name,
+        preflight_answers=source.preflight_answers,
+        preflight_schema_version=source.preflight_schema_version,
+        preflight_answered_at=source.preflight_answered_at,
+        defence_tags=source.defence_tags,
+        cloned_from=source.id,
+    )
+    db.add(clone)
+    db.flush()
+
+    # Copy checklist items (structure only — no completions)
+    source_items = (
+        db.query(ChecklistItem)
+        .filter(ChecklistItem.change_id == source.id)
+        .order_by(ChecklistItem.phase, ChecklistItem.order)
+        .all()
+    )
+    for item in source_items:
+        clone_item = ChecklistItem(
+            change_id=clone.id,
+            phase=item.phase,
+            order=item.order,
+            description=item.description,
+            command=item.command,
+            expected_outcome=item.expected_outcome,
+            rollback_action=item.rollback_action,
+            is_hold_point=item.is_hold_point,
+        )
+        db.add(clone_item)
+
+    audit = AuditEvent(
+        change_id=clone.id,
+        event_type="change_duplicated",
+        actor_name=author_name,
+        description=f"Duplicated from change {source.id} ('{source.title}')",
+        event_data={"source_change_id": str(source.id)},
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(clone)
+    return clone
+
+
 def transition_status(
     db: Session, change: Change, new_status: ChangeStatus, actor_name: str
 ) -> Change:

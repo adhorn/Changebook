@@ -9,6 +9,7 @@ from app.models.checklist import ChecklistPhase
 from app.schemas.changes import (
     ChangeCreate,
     ChangeDetailResponse,
+    ChangeDuplicate,
     ChangeListResponse,
     ChangeResponse,
     ChangeUpdate,
@@ -73,6 +74,21 @@ def get_change(change_id: uuid.UUID, db: Session = Depends(get_db)):
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
     return change
+
+
+@router.post("/{change_id}/duplicate", response_model=ChangeDetailResponse, status_code=201)
+def duplicate_change(
+    change_id: uuid.UUID,
+    payload: ChangeDuplicate,
+    db: Session = Depends(get_db),
+):
+    source = change_service.get_change(db, change_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Change not found")
+
+    overrides = payload.model_dump(exclude={"author_name"}, exclude_unset=True)
+    clone = change_service.duplicate_change(db, source, overrides, payload.author_name)
+    return clone
 
 
 @router.patch("/{change_id}", response_model=ChangeDetailResponse)

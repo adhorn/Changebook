@@ -33,6 +33,14 @@ class ChangeCreate(BaseModel):
         return v
 
 
+class ChangeDuplicate(BaseModel):
+    author_name: str
+    title: str | None = None
+    customer_id: uuid.UUID | None = None
+    service_id: uuid.UUID | None = None
+    environment_id: uuid.UUID | None = None
+
+
 class ChangeUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
