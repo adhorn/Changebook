@@ -1,7 +1,8 @@
 import enum
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Enum, ForeignKey, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, PortableJSON, PortableUUID, TimestampMixin, UUIDMixin
@@ -59,6 +60,11 @@ class Change(UUIDMixin, TimestampMixin, Base):
 
     # Tracks which version of the question schema the answers were written against
     preflight_schema_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # When pre-flight answers were last written (for 24h staleness check)
+    preflight_answered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Defence tags — validated against ALLOWED_DEFENCE_TAGS
     defence_tags: Mapped[list | None] = mapped_column(PortableJSON, nullable=True)

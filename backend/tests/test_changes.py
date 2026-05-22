@@ -125,19 +125,29 @@ class TestStateTransitions:
                     keys.append(q["key"])
         return {key: f"Answer for {key}" for key in keys}
 
-    def _create_change(self, client, sample_change_data, with_preflight=False):
+    def _add_items_to_all_phases(self, client, change_id):
+        for phase in ["pre_flight", "execution", "verification"]:
+            client.post(
+                f"/api/v1/changes/{change_id}/checklist",
+                json={"phase": phase, "description": f"{phase} step"},
+            )
+
+    def _create_change(self, client, sample_change_data, ready_for_review=False):
         data = {
             "title": "Test change",
             "author_name": "Adrian Hornsby",
             **sample_change_data,
         }
-        if with_preflight:
+        if ready_for_review:
             data["preflight_answers"] = self._complete_preflight_answers(client)
         resp = client.post("/api/v1/changes", json=data)
-        return resp.json()["id"]
+        change_id = resp.json()["id"]
+        if ready_for_review:
+            self._add_items_to_all_phases(client, change_id)
+        return change_id
 
     def test_draft_to_in_review(self, client, sample_change_data):
-        change_id = self._create_change(client, sample_change_data, with_preflight=True)
+        change_id = self._create_change(client, sample_change_data, ready_for_review=True)
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
             params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
@@ -147,7 +157,7 @@ class TestStateTransitions:
 
     def test_cannot_skip_to_executing(self, client, sample_change_data):
         """Cannot jump from draft to executing — must go through review first."""
-        change_id = self._create_change(client, sample_change_data, with_preflight=True)
+        change_id = self._create_change(client, sample_change_data, ready_for_review=True)
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
             params={"target_status": "executing", "actor_name": "Adrian Hornsby"},
@@ -156,7 +166,7 @@ class TestStateTransitions:
 
     def test_full_lifecycle(self, client, sample_change_data):
         """A change can go through the full lifecycle."""
-        change_id = self._create_change(client, sample_change_data, with_preflight=True)
+        change_id = self._create_change(client, sample_change_data, ready_for_review=True)
 
         transitions = ["in_review", "approved", "executing", "done"]
         for status in transitions:
@@ -179,7 +189,7 @@ class TestStateTransitions:
 
     def test_done_is_terminal(self, client, sample_change_data):
         """Once done, a change cannot transition to any other state."""
-        change_id = self._create_change(client, sample_change_data, with_preflight=True)
+        change_id = self._create_change(client, sample_change_data, ready_for_review=True)
         for status in ["in_review", "approved", "executing", "done"]:
             client.post(
                 f"/api/v1/changes/{change_id}/transition",

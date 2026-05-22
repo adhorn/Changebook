@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -7,11 +8,14 @@ from app.models.change import Change, ChangeStatus
 from app.models.checklist import ChecklistItem, ChecklistPhase
 from app.models.preflight import PREFLIGHT_SCHEMA_VERSION, validate_preflight_completeness
 
+STALENESS_THRESHOLD = timedelta(hours=24)
+
 
 def create_change(db: Session, data: dict) -> Change:
-    # Auto-set schema version when preflight answers are provided
+    # Auto-set schema version and timestamp when preflight answers are provided
     if data.get("preflight_answers"):
         data.setdefault("preflight_schema_version", PREFLIGHT_SCHEMA_VERSION)
+        data.setdefault("preflight_answered_at", datetime.now(UTC))
     change = Change(**data)
     db.add(change)
     db.flush()
@@ -74,9 +78,10 @@ def list_changes(
 
 
 def update_change(db: Session, change: Change, data: dict, actor_name: str) -> Change:
-    # Auto-set schema version when preflight answers are updated
+    # Auto-set schema version and timestamp when preflight answers are updated
     if "preflight_answers" in data and data["preflight_answers"]:
         data.setdefault("preflight_schema_version", PREFLIGHT_SCHEMA_VERSION)
+        data["preflight_answered_at"] = datetime.now(UTC)
 
     for key, value in data.items():
         if value is not None:
@@ -101,14 +106,58 @@ def transition_status(
     old_status = change.status
     _validate_transition(old_status, new_status)
 
-    # Pre-flight completeness gate: all required answers must be filled before review
+    # Gates on transition to in_review
     if new_status == ChangeStatus.IN_REVIEW:
-        missing = validate_preflight_completeness(change.preflight_answers)
-        if missing:
+        # Gate 1: all required pre-flight answers must be filled
+        missing_answers = validate_preflight_completeness(change.preflight_answers)
+        if missing_answers:
             raise ValueError(
                 f"Cannot submit for review — incomplete pre-flight answers. "
-                f"Missing: {missing}"
+                f"Missing: {missing_answers}"
             )
+
+        # Gate 2: all three phases must have at least one checklist item
+        phases_with_items = set(
+            row[0]
+            for row in db.query(ChecklistItem.phase)
+            .filter(ChecklistItem.change_id == change.id)
+            .distinct()
+            .all()
+        )
+        required_phases = {
+            ChecklistPhase.PRE_FLIGHT,
+            ChecklistPhase.EXECUTION,
+            ChecklistPhase.VERIFICATION,
+        }
+        missing_phases = required_phases - phases_with_items
+        if missing_phases:
+            raise ValueError(
+                f"Cannot submit for review — checklist items required in all "
+                f"three phases. Missing: {sorted(p.value for p in missing_phases)}"
+            )
+
+    # Staleness warning on transition to executing
+    if new_status == ChangeStatus.EXECUTING and change.preflight_answered_at:
+        answered_at = change.preflight_answered_at
+        # SQLite returns naive datetimes; ensure both are tz-aware for comparison
+        if answered_at.tzinfo is None:
+            answered_at = answered_at.replace(tzinfo=UTC)
+        age = datetime.now(UTC) - answered_at
+        if age > STALENESS_THRESHOLD:
+            staleness_audit = AuditEvent(
+                change_id=change.id,
+                event_type="staleness_warning",
+                actor_name=actor_name,
+                description=(
+                    f"Pre-flight answers are {age.total_seconds() / 3600:.0f}h old "
+                    f"(threshold: 24h). Operator acknowledged stale pre-flight."
+                ),
+                event_data={
+                    "preflight_answered_at": change.preflight_answered_at.isoformat(),
+                    "hours_stale": round(age.total_seconds() / 3600, 1),
+                },
+            )
+            db.add(staleness_audit)
 
     change.status = new_status
 

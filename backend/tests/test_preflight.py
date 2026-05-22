@@ -256,12 +256,20 @@ class TestPreflightValidationOnTransition:
         )
         assert resp.status_code == 422
 
+    def _add_items_to_all_phases(self, client, change_id):
+        for phase in ["pre_flight", "execution", "verification"]:
+            client.post(
+                f"/api/v1/changes/{change_id}/checklist",
+                json={"phase": phase, "description": f"{phase} step"},
+            )
+
     def test_can_submit_with_complete_answers(self, client, sample_change_data):
         """A change with all required answers filled in can move to in_review."""
         answers = self._make_complete_answers(client)
         change_id = self._create_change(
             client, sample_change_data, preflight_answers=answers
         )
+        self._add_items_to_all_phases(client, change_id)
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
