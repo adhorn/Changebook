@@ -1,9 +1,12 @@
 import uuid
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.models.audit import AuditEvent
 from app.models.change import ChangeStatus
 from app.models.checklist import ChecklistPhase
 from app.schemas.changes import (
@@ -48,10 +51,17 @@ def list_changes(
     status: ChangeStatus | None = None,
     author_name: str | None = None,
     defence_tag: str | None = None,
+    title_search: str | None = None,
+    created_after: str | None = None,
+    created_before: str | None = None,
+    sort: str | None = None,
     limit: int = Query(default=50, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
 ):
+    created_after_dt = datetime.fromisoformat(created_after) if created_after else None
+    created_before_dt = datetime.fromisoformat(created_before) if created_before else None
+
     changes, total = change_service.list_changes(
         db,
         customer_id=customer_id,
@@ -60,11 +70,34 @@ def list_changes(
         status=status,
         author_name=author_name,
         defence_tag=defence_tag,
+        title_search=title_search,
+        created_after=created_after_dt,
+        created_before=created_before_dt,
+        sort=sort,
         limit=limit,
         offset=offset,
     )
+
+    # Compute audit event counts
+    change_ids = [c.id for c in changes]
+    if change_ids:
+        counts = dict(
+            db.query(AuditEvent.change_id, func.count(AuditEvent.id))
+            .filter(AuditEvent.change_id.in_(change_ids))
+            .group_by(AuditEvent.change_id)
+            .all()
+        )
+    else:
+        counts = {}
+
+    data = []
+    for c in changes:
+        resp = ChangeResponse.model_validate(c)
+        resp.audit_event_count = counts.get(c.id, 0)
+        data.append(resp)
+
     return ChangeListResponse(
-        data=[ChangeResponse.model_validate(c) for c in changes],
+        data=data,
         meta={"total": total, "limit": limit, "offset": offset},
     )
 

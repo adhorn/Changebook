@@ -46,6 +46,10 @@ def list_changes(
     status: ChangeStatus | None = None,
     author_name: str | None = None,
     defence_tag: str | None = None,
+    title_search: str | None = None,
+    created_after: datetime | None = None,
+    created_before: datetime | None = None,
+    sort: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Change], int]:
@@ -61,6 +65,13 @@ def list_changes(
         query = query.filter(Change.status == status)
     if author_name:
         query = query.filter(Change.author_name == author_name)
+    if title_search:
+        query = query.filter(Change.title.ilike(f"%{title_search}%"))
+    if created_after:
+        query = query.filter(Change.created_at >= created_after)
+    if created_before:
+        query = query.filter(Change.created_at <= created_before)
+
     # Defence tag filtering requires JSON contains — handled at DB level
     # For SQLite compatibility, we filter in Python for now
     if defence_tag:
@@ -73,8 +84,17 @@ def list_changes(
         changes = filtered[offset : offset + limit]
         return changes, total
 
+    # Sorting
+    if sort == "oldest":
+        order = Change.created_at.asc()
+    elif sort == "recently_updated":
+        order = Change.updated_at.desc()
+    else:
+        # Default: newest first
+        order = Change.created_at.desc()
+
     total = query.count()
-    changes = query.order_by(Change.created_at.desc()).offset(offset).limit(limit).all()
+    changes = query.order_by(order).offset(offset).limit(limit).all()
     return changes, total
 
 

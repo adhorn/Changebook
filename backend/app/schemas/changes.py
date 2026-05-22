@@ -84,6 +84,7 @@ class ChangeResponse(BaseModel):
     cloned_from: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
+    audit_event_count: int | None = None
 
 
 class ChangeDetailResponse(ChangeResponse):
