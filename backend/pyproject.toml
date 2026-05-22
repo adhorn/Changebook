@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "changebook"
+version = "0.1.0"
+description = "Production change tracking — from plan to verification"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+    { name = "Adrian Hornsby", email = "adhorn@resiliumlabs.com" },
+]
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "sqlalchemy>=2.0.25",
+    "alembic>=1.13.0",
+    "psycopg2-binary>=2.9.9",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "python-multipart>=0.0.6",
+]
+
+[project.urls]
+Repository = "https://github.com/adrianhornsby/changebook"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-asyncio>=0.23.0",
+    "httpx>=0.26.0",
+    "ruff>=0.2.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+# Pre-flight question definitions contain long natural-language strings
+"app/models/preflight.py" = ["E501"]
+# Realistic test data contains long strings (commands, descriptions, outputs)
+"tests/test_realistic_content.py" = ["E501"]
+# Seed data contains long shell commands and expected outcomes
+"seed.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
