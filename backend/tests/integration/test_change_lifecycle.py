@@ -167,18 +167,12 @@ class TestPostgresSpecificBehaviour:
 
     def test_multiple_environments_as_json_array(self, client, org_and_team):
         """Multiple environment IDs stored as JSON array in Postgres."""
-        org_id = org_and_team["org_id"]
-
         # Create three environments
         env_ids = []
         for name in ["PROD-EU-01", "PROD-EU-02", "PROD-US-01"]:
             resp = client.post(
                 "/api/v1/environments",
-                json={
-                    "name": name,
-                    "platform": "Azure",
-                    "organisation_id": org_id,
-                },
+                json={"name": name, "platform": "Azure"},
             )
             env_ids.append(resp.json()["id"])
 

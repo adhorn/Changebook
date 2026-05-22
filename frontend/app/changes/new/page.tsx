@@ -3,24 +3,25 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { api, Team } from "@/lib/api";
+import { api, Team, CustomerDetail } from "@/lib/api";
 
+// The pre-flight checklist is structured around cognitive forcing functions.
+// Each section makes the operator think about a different dimension of the change
+// BEFORE they start planning execution. This is the "think" phase, not the "do" phase.
 const PREFLIGHT_SECTIONS = [
   {
     title: "The Change",
+    description: "What are you doing and what should happen?",
     fields: [
       { key: "what_is_this_change", label: "What is this change?" },
-      { key: "systems_affected", label: "What systems/services are affected?" },
       { key: "expected_outcome", label: "What is the expected outcome?" },
     ],
   },
   {
     title: "What the Customer Experiences",
+    description:
+      "Think from the customer's perspective, not yours.",
     fields: [
-      {
-        key: "who_is_using",
-        label: "Who is using this system right now? What are they trying to do?",
-      },
       {
         key: "customer_notice",
         label: "Will the customer notice this change? How?",
@@ -28,12 +29,13 @@ const PREFLIGHT_SECTIONS = [
       {
         key: "customer_mid_failure",
         label:
-          "If this change fails mid-execution, what is the customer in the middle of doing? What happens to their work?",
+          "If this change fails mid-way, what is the customer in the middle of doing? What happens to their work?",
       },
     ],
   },
   {
     title: "Failure and Recovery",
+    description: "Assume this will go wrong. What then?",
     fields: [
       { key: "what_if_fails", label: "What happens if this change fails?" },
       { key: "rollback_plan", label: "How do you roll back?" },
@@ -44,12 +46,13 @@ const PREFLIGHT_SECTIONS = [
       },
       {
         key: "blast_radius",
-        label: "What is the blast radius? (customers/systems/environments)",
+        label: "What is the blast radius? (customers/environments)",
       },
     ],
   },
   {
     title: "Timing and Coordination",
+    description: "Is this the right moment — for the customer, not just for you?",
     fields: [
       { key: "maintenance_window", label: "Is there a maintenance window? When?" },
       {
@@ -69,25 +72,10 @@ const PREFLIGHT_SECTIONS = [
   },
 ];
 
-interface StepInput {
-  description: string;
-  expected_outcome: string;
-  rollback_action: string;
-  script: string;
-  is_hold_point: boolean;
-}
-
-const EMPTY_STEP: StepInput = {
-  description: "",
-  expected_outcome: "",
-  rollback_action: "",
-  script: "",
-  is_hold_point: false,
-};
-
 export default function NewChange() {
   const router = useRouter();
   const [teams, setTeams] = useState<Team[]>([]);
+  const [customers, setCustomers] = useState<CustomerDetail[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,29 +84,24 @@ export default function NewChange() {
   const [description, setDescription] = useState("");
   const [teamId, setTeamId] = useState("");
   const [authorName, setAuthorName] = useState("");
+  const [selectedCustomerIds, setSelectedCustomerIds] = useState<string[]>([]);
   const [preflightAnswers, setPreflightAnswers] = useState<Record<string, string>>({});
-  const [steps, setSteps] = useState<StepInput[]>([{ ...EMPTY_STEP }]);
 
   useEffect(() => {
     api.listTeams().then(setTeams).catch(console.error);
+    api.listCustomers().then(setCustomers).catch(console.error);
   }, []);
 
   function updatePreflight(key: string, value: string) {
     setPreflightAnswers((prev) => ({ ...prev, [key]: value }));
   }
 
-  function updateStep(index: number, field: keyof StepInput, value: string | boolean) {
-    setSteps((prev) =>
-      prev.map((s, i) => (i === index ? { ...s, [field]: value } : s))
+  function toggleCustomer(customerId: string) {
+    setSelectedCustomerIds((prev) =>
+      prev.includes(customerId)
+        ? prev.filter((id) => id !== customerId)
+        : [...prev, customerId]
     );
-  }
-
-  function addStep() {
-    setSteps((prev) => [...prev, { ...EMPTY_STEP }]);
-  }
-
-  function removeStep(index: number) {
-    setSteps((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -132,16 +115,8 @@ export default function NewChange() {
         description: description || undefined,
         team_id: teamId,
         author_name: authorName,
+        customer_ids: selectedCustomerIds.length > 0 ? selectedCustomerIds : undefined,
         preflight_answers: preflightAnswers,
-        steps: steps
-          .filter((s) => s.description.trim())
-          .map((s) => ({
-            description: s.description,
-            expected_outcome: s.expected_outcome || undefined,
-            rollback_action: s.rollback_action || undefined,
-            script: s.script || undefined,
-            is_hold_point: s.is_hold_point,
-          })),
       });
       router.push(`/changes/${change.id}`);
     } catch (err: unknown) {
@@ -160,7 +135,9 @@ export default function NewChange() {
             </Link>
             <div>
               <h1 className="text-xl font-semibold text-gray-900">New Change</h1>
-              <p className="text-sm text-gray-500">Pre-flight checklist</p>
+              <p className="text-sm text-gray-500">
+                Think before you act — what, who, what-if, when
+              </p>
             </div>
           </div>
         </div>
@@ -231,6 +208,59 @@ export default function NewChange() {
             </div>
           </div>
 
+          {/* Customer selection */}
+          {customers.length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+              <h2 className="text-lg font-medium text-gray-900">
+                Affected Customers
+              </h2>
+              <p className="text-sm text-gray-500">
+                Which customers are affected by this change?
+              </p>
+              <div className="space-y-2">
+                {customers.map((customer) => (
+                  <label
+                    key={customer.id}
+                    className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-colors ${
+                      selectedCustomerIds.includes(customer.id)
+                        ? "border-gray-900 bg-gray-50"
+                        : "border-gray-200 hover:border-gray-300"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedCustomerIds.includes(customer.id)}
+                      onChange={() => toggleCustomer(customer.id)}
+                      className="mt-0.5 rounded border-gray-300"
+                    />
+                    <div>
+                      <span className="text-sm font-medium text-gray-900">
+                        {customer.name}
+                      </span>
+                      {customer.description && (
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {customer.description}
+                        </p>
+                      )}
+                      {customer.services.length > 0 && (
+                        <div className="flex gap-1.5 mt-1.5">
+                          {customer.services.map((svc) => (
+                            <span
+                              key={svc.id}
+                              className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600"
+                            >
+                              {svc.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Pre-flight questions */}
           {PREFLIGHT_SECTIONS.map((section) => (
             <div
@@ -238,6 +268,9 @@ export default function NewChange() {
               className="bg-white rounded-lg border border-gray-200 p-6 space-y-4"
             >
               <h2 className="text-lg font-medium text-gray-900">{section.title}</h2>
+              {section.description && (
+                <p className="text-sm text-gray-500 -mt-2">{section.description}</p>
+              )}
               {section.fields.map((field) => (
                 <div key={field.key}>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -253,102 +286,6 @@ export default function NewChange() {
               ))}
             </div>
           ))}
-
-          {/* Execution steps */}
-          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-medium text-gray-900">Execution Steps</h2>
-              <button
-                type="button"
-                onClick={addStep}
-                className="text-sm text-gray-600 hover:text-gray-900"
-              >
-                + Add Step
-              </button>
-            </div>
-            {steps.map((step, index) => (
-              <div
-                key={index}
-                className="border border-gray-200 rounded-lg p-4 space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-500">
-                    Step {index + 1}
-                  </span>
-                  {steps.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeStep(index)}
-                      className="text-xs text-red-500 hover:text-red-700"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    What to do
-                  </label>
-                  <textarea
-                    value={step.description}
-                    onChange={(e) => updateStep(index, "description", e.target.value)}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Expected outcome
-                    </label>
-                    <input
-                      type="text"
-                      value={step.expected_outcome}
-                      onChange={(e) =>
-                        updateStep(index, "expected_outcome", e.target.value)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Rollback action
-                    </label>
-                    <input
-                      type="text"
-                      value={step.rollback_action}
-                      onChange={(e) =>
-                        updateStep(index, "rollback_action", e.target.value)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">
-                    Script / command (optional)
-                  </label>
-                  <textarea
-                    value={step.script}
-                    onChange={(e) => updateStep(index, "script", e.target.value)}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
-                </div>
-                <label className="flex items-center gap-2 text-sm text-gray-600">
-                  <input
-                    type="checkbox"
-                    checked={step.is_hold_point}
-                    onChange={(e) =>
-                      updateStep(index, "is_hold_point", e.target.checked)
-                    }
-                    className="rounded border-gray-300"
-                  />
-                  Hold point — requires independent verification before proceeding
-                </label>
-              </div>
-            ))}
-          </div>
 
           {/* Submit */}
           {error && (

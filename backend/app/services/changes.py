@@ -1,22 +1,16 @@
 import uuid
 
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from app.models.audit import AuditEvent
 from app.models.change import Change, ChangeStatus
-from app.models.step import Step
+from app.models.checklist import ChecklistItem, ChecklistPhase
 
 
 def create_change(db: Session, data: dict) -> Change:
-    steps_data = data.pop("steps", None) or []
-
     change = Change(**data)
     db.add(change)
     db.flush()
-
-    for i, step_data in enumerate(steps_data):
-        step = Step(change_id=change.id, order=i + 1, **step_data)
-        db.add(step)
 
     audit = AuditEvent(
         change_id=change.id,
@@ -32,22 +26,43 @@ def create_change(db: Session, data: dict) -> Change:
 
 
 def get_change(db: Session, change_id: uuid.UUID) -> Change | None:
-    return db.query(Change).options(joinedload(Change.steps)).filter(Change.id == change_id).first()
+    return db.query(Change).filter(Change.id == change_id).first()
 
 
 def list_changes(
     db: Session,
-    team_id: uuid.UUID | None = None,
+    customer_id: uuid.UUID | None = None,
+    service_id: uuid.UUID | None = None,
+    environment_id: uuid.UUID | None = None,
     status: ChangeStatus | None = None,
+    author_name: str | None = None,
+    defence_tag: str | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> tuple[list[Change], int]:
     query = db.query(Change)
 
-    if team_id:
-        query = query.filter(Change.team_id == team_id)
+    if customer_id:
+        query = query.filter(Change.customer_id == customer_id)
+    if service_id:
+        query = query.filter(Change.service_id == service_id)
+    if environment_id:
+        query = query.filter(Change.environment_id == environment_id)
     if status:
         query = query.filter(Change.status == status)
+    if author_name:
+        query = query.filter(Change.author_name == author_name)
+    # Defence tag filtering requires JSON contains — handled at DB level
+    # For SQLite compatibility, we filter in Python for now
+    if defence_tag:
+        all_changes = query.all()
+        filtered = [
+            c for c in all_changes
+            if c.defence_tags and defence_tag in c.defence_tags
+        ]
+        total = len(filtered)
+        changes = filtered[offset : offset + limit]
+        return changes, total
 
     total = query.count()
     changes = query.order_by(Change.created_at.desc()).offset(offset).limit(limit).all()
@@ -93,22 +108,53 @@ def transition_status(
     return change
 
 
+# --- Checklist operations ---
+
+
+def add_checklist_item(
+    db: Session, change_id: uuid.UUID, data: dict
+) -> ChecklistItem:
+    phase = data["phase"]
+
+    # Auto-order: next in sequence for this phase
+    max_order = (
+        db.query(ChecklistItem)
+        .filter(
+            ChecklistItem.change_id == change_id,
+            ChecklistItem.phase == phase,
+        )
+        .count()
+    )
+
+    item = ChecklistItem(
+        change_id=change_id,
+        order=max_order + 1,
+        **data,
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+def list_checklist_items(
+    db: Session,
+    change_id: uuid.UUID,
+    phase: ChecklistPhase | None = None,
+) -> list[ChecklistItem]:
+    query = db.query(ChecklistItem).filter(ChecklistItem.change_id == change_id)
+    if phase:
+        query = query.filter(ChecklistItem.phase == phase)
+    return query.order_by(ChecklistItem.phase, ChecklistItem.order).all()
+
+
 # Valid state transitions
 VALID_TRANSITIONS = {
     ChangeStatus.DRAFT: {ChangeStatus.IN_REVIEW, ChangeStatus.ABORTED},
     ChangeStatus.IN_REVIEW: {ChangeStatus.APPROVED, ChangeStatus.DRAFT, ChangeStatus.ABORTED},
     ChangeStatus.APPROVED: {ChangeStatus.EXECUTING, ChangeStatus.ABORTED},
-    ChangeStatus.EXECUTING: {
-        ChangeStatus.AWAITING_VERIFICATION,
-        ChangeStatus.ABORTED,
-    },
-    ChangeStatus.AWAITING_VERIFICATION: {
-        ChangeStatus.VERIFIED,
-        ChangeStatus.EXECUTING,  # can go back if verification fails
-        ChangeStatus.ABORTED,
-    },
-    ChangeStatus.VERIFIED: {ChangeStatus.CLOSED},
-    ChangeStatus.CLOSED: set(),
+    ChangeStatus.EXECUTING: {ChangeStatus.DONE, ChangeStatus.ABORTED},
+    ChangeStatus.DONE: set(),
     ChangeStatus.ABORTED: set(),
 }
 

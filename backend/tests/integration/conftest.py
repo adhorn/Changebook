@@ -79,14 +79,11 @@ def client(db):
 
 @pytest.fixture
 def org_and_team(client):
-    """Create a default organisation and team."""
-    org = client.post("/api/v1/organisations", json={"name": "Integration Test Org"})
-    org_id = org.json()["id"]
+    """Create a default team. Organisation is auto-injected."""
+    team = client.post("/api/v1/teams", json={"name": "Platform Team"})
+    team_data = team.json()
 
-    team = client.post("/api/v1/teams", json={"name": "Platform Team", "organisation_id": org_id})
-    team_id = team.json()["id"]
-
-    return {"org_id": org_id, "team_id": team_id}
+    return {"org_id": team_data["organisation_id"], "team_id": team_data["id"]}
 
 
 @pytest.fixture
@@ -98,7 +95,6 @@ def environment(client, org_and_team):
             "name": "PROD-EU-01",
             "platform": "Azure",
             "description": "Production EU client 1",
-            "organisation_id": org_and_team["org_id"],
         },
     )
     return resp.json()

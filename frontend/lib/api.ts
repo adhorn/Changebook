@@ -36,6 +36,7 @@ export interface Change {
   status: ChangeStatus;
   team_id: string;
   author_name: string;
+  customer_ids: string[] | null;
   environment_ids: string[] | null;
   preflight_answers: Record<string, string> | null;
   defence_tags: string[] | null;
@@ -63,17 +64,31 @@ export interface ChangeListResponse {
   meta: { total: number; limit: number; offset: number };
 }
 
-export interface Organisation {
-  id: string;
-  name: string;
-  created_at: string;
-}
-
 export interface Team {
   id: string;
   name: string;
   organisation_id: string;
   created_at: string;
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  description: string | null;
+  organisation_id: string;
+  created_at: string;
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  description: string | null;
+  customer_id: string;
+  created_at: string;
+}
+
+export interface CustomerDetail extends Customer {
+  services: Service[];
 }
 
 export interface Environment {
@@ -82,6 +97,7 @@ export interface Environment {
   platform: string | null;
   description: string | null;
   organisation_id: string;
+  customer_id: string | null;
   created_at: string;
 }
 
@@ -104,16 +120,10 @@ export const api = {
     description?: string;
     team_id: string;
     author_name: string;
+    customer_ids?: string[];
     environment_ids?: string[];
     preflight_answers?: Record<string, string>;
     defence_tags?: string[];
-    steps?: {
-      description: string;
-      expected_outcome?: string;
-      rollback_action?: string;
-      script?: string;
-      is_hold_point?: boolean;
-    }[];
   }) => request<ChangeDetail>("/changes", { method: "POST", body: JSON.stringify(data) }),
 
   transitionChange: (id: string, targetStatus: ChangeStatus, actorName: string) =>
@@ -122,35 +132,39 @@ export const api = {
       { method: "POST" }
     ),
 
-  // Organisations
-  listOrganisations: () => request<Organisation[]>("/organisations"),
-  createOrganisation: (name: string) =>
-    request<Organisation>("/organisations", {
+  // Teams
+  listTeams: () => request<Team[]>("/teams"),
+  createTeam: (name: string) =>
+    request<Team>("/teams", {
       method: "POST",
       body: JSON.stringify({ name }),
     }),
 
-  // Teams
-  listTeams: (organisationId?: string) => {
-    const qs = organisationId ? `?organisation_id=${organisationId}` : "";
-    return request<Team[]>(`/teams${qs}`);
-  },
-  createTeam: (name: string, organisationId: string) =>
-    request<Team>("/teams", {
+  // Customers
+  listCustomers: () => request<CustomerDetail[]>("/customers"),
+  getCustomer: (id: string) => request<CustomerDetail>(`/customers/${id}`),
+  createCustomer: (data: {
+    name: string;
+    description?: string;
+    services?: { name: string; description?: string }[];
+  }) =>
+    request<CustomerDetail>("/customers", {
       method: "POST",
-      body: JSON.stringify({ name, organisation_id: organisationId }),
+      body: JSON.stringify(data),
+    }),
+  addService: (customerId: string, data: { name: string; description?: string }) =>
+    request<Service>(`/customers/${customerId}/services`, {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
 
   // Environments
-  listEnvironments: (organisationId?: string) => {
-    const qs = organisationId ? `?organisation_id=${organisationId}` : "";
-    return request<Environment[]>(`/environments${qs}`);
-  },
+  listEnvironments: () => request<Environment[]>("/environments"),
   createEnvironment: (data: {
     name: string;
     platform?: string;
     description?: string;
-    organisation_id: string;
+    customer_id?: string;
   }) =>
     request<Environment>("/environments", {
       method: "POST",

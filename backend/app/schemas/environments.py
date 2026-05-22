@@ -8,7 +8,8 @@ class EnvironmentCreate(BaseModel):
     name: str
     platform: str | None = None
     description: str | None = None
-    organisation_id: uuid.UUID
+    # organisation_id is auto-injected by the backend (invisible tenant)
+    customer_id: uuid.UUID | None = None
 
 
 class EnvironmentResponse(BaseModel):
@@ -19,4 +20,5 @@ class EnvironmentResponse(BaseModel):
     platform: str | None
     description: str | None
     organisation_id: uuid.UUID
+    customer_id: uuid.UUID | None
     created_at: datetime

@@ -7,19 +7,9 @@ Templates will override these with their own question sets.
 DEFAULT_PREFLIGHT_QUESTIONS = {
     "the_change": [
         {"key": "what_is_this_change", "label": "What is this change?", "type": "text"},
-        {
-            "key": "systems_affected",
-            "label": "What systems/services are affected?",
-            "type": "text",
-        },
         {"key": "expected_outcome", "label": "What is the expected outcome?", "type": "text"},
     ],
     "customer_impact": [
-        {
-            "key": "who_is_using",
-            "label": "Who is using this system right now? What are they trying to do?",
-            "type": "text",
-        },
         {
             "key": "customer_notice",
             "label": "Will the customer notice this change? How?",

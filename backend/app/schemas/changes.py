@@ -1,54 +1,62 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
-from app.models.change import ChangeStatus
+from app.models.change import ALLOWED_DEFENCE_TAGS, ChangeStatus
 
 # --- Request schemas ---
-
-
-class StepCreate(BaseModel):
-    description: str
-    expected_outcome: str | None = None
-    rollback_action: str | None = None
-    script: str | None = None
-    is_hold_point: bool = False
 
 
 class ChangeCreate(BaseModel):
     title: str
     description: str | None = None
-    team_id: uuid.UUID
+    customer_id: uuid.UUID
+    service_id: uuid.UUID
+    environment_id: uuid.UUID
     author_name: str
-    environment_ids: list[uuid.UUID] | None = None
     preflight_answers: dict | None = None
     defence_tags: list[str] | None = None
-    steps: list[StepCreate] | None = None
+    cloned_from: uuid.UUID | None = None
+
+    @field_validator("defence_tags")
+    @classmethod
+    def validate_defence_tags(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        invalid = [tag for tag in v if tag not in ALLOWED_DEFENCE_TAGS]
+        if invalid:
+            raise ValueError(
+                f"Invalid defence tags: {invalid}. "
+                f"Allowed tags: {ALLOWED_DEFENCE_TAGS}"
+            )
+        return v
 
 
 class ChangeUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
+    customer_id: uuid.UUID | None = None
+    service_id: uuid.UUID | None = None
+    environment_id: uuid.UUID | None = None
     preflight_answers: dict | None = None
     defence_tags: list[str] | None = None
-    environment_ids: list[uuid.UUID] | None = None
+
+    @field_validator("defence_tags")
+    @classmethod
+    def validate_defence_tags(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return v
+        invalid = [tag for tag in v if tag not in ALLOWED_DEFENCE_TAGS]
+        if invalid:
+            raise ValueError(
+                f"Invalid defence tags: {invalid}. "
+                f"Allowed tags: {ALLOWED_DEFENCE_TAGS}"
+            )
+        return v
 
 
 # --- Response schemas ---
-
-
-class StepResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: uuid.UUID
-    order: int
-    description: str
-    expected_outcome: str | None
-    rollback_action: str | None
-    script: str | None
-    is_hold_point: bool
-    created_at: datetime
 
 
 class ChangeResponse(BaseModel):
@@ -58,17 +66,19 @@ class ChangeResponse(BaseModel):
     title: str
     description: str | None
     status: ChangeStatus
-    team_id: uuid.UUID
+    customer_id: uuid.UUID
+    service_id: uuid.UUID
+    environment_id: uuid.UUID
     author_name: str
-    environment_ids: list[uuid.UUID] | None
     preflight_answers: dict | None
     defence_tags: list[str] | None
+    cloned_from: uuid.UUID | None
     created_at: datetime
     updated_at: datetime
 
 
 class ChangeDetailResponse(ChangeResponse):
-    steps: list[StepResponse] = []
+    pass  # Will add checklist_items here in Feature 3
 
 
 class ChangeListResponse(BaseModel):

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { api, ChangeDetail, ChangeStatus } from "@/lib/api";
+import { api, ChangeDetail, ChangeStatus, CustomerDetail } from "@/lib/api";
 
 const STATUS_COLORS: Record<ChangeStatus, string> = {
   draft: "bg-gray-100 text-gray-700",
@@ -38,9 +38,7 @@ const NEXT_TRANSITIONS: Partial<Record<ChangeStatus, { label: string; target: Ch
 
 const PREFLIGHT_LABELS: Record<string, string> = {
   what_is_this_change: "What is this change?",
-  systems_affected: "What systems/services are affected?",
   expected_outcome: "What is the expected outcome?",
-  who_is_using: "Who is using this system right now?",
   customer_notice: "Will the customer notice this change?",
   customer_mid_failure: "If this change fails, what is the customer doing?",
   what_if_fails: "What happens if this change fails?",
@@ -68,6 +66,7 @@ export default function ChangeDetailPage() {
   const id = params.id as string;
 
   const [change, setChange] = useState<ChangeDetail | null>(null);
+  const [customers, setCustomers] = useState<CustomerDetail[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [transitioning, setTransitioning] = useState(false);
@@ -78,6 +77,12 @@ export default function ChangeDetailPage() {
       .then((c) => {
         setChange(c);
         setLoading(false);
+        // Load customer details if the change has customer_ids
+        if (c.customer_ids && c.customer_ids.length > 0) {
+          Promise.all(c.customer_ids.map((cid) => api.getCustomer(cid)))
+            .then(setCustomers)
+            .catch(console.error);
+        }
       })
       .catch((err) => {
         setError(err.message);
@@ -179,6 +184,44 @@ export default function ChangeDetailPage() {
                 {tag}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Affected customers */}
+        {customers.length > 0 && (
+          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
+            <h2 className="text-lg font-medium text-gray-900">Affected Customers</h2>
+            <div className="space-y-2">
+              {customers.map((customer) => (
+                <div
+                  key={customer.id}
+                  className="flex items-start gap-3 p-3 border border-gray-100 rounded-lg"
+                >
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">
+                      {customer.name}
+                    </span>
+                    {customer.description && (
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {customer.description}
+                      </p>
+                    )}
+                    {customer.services.length > 0 && (
+                      <div className="flex gap-1.5 mt-1.5">
+                        {customer.services.map((svc) => (
+                          <span
+                            key={svc.id}
+                            className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600"
+                          >
+                            {svc.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

@@ -15,4 +15,3 @@ class Team(UUIDMixin, TimestampMixin, Base):
     )
 
     organisation: Mapped["Organisation"] = relationship(back_populates="teams")  # noqa: F821
-    changes: Mapped[list["Change"]] = relationship(back_populates="team")  # noqa: F821
