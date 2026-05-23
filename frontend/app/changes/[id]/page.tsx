@@ -451,6 +451,7 @@ export default function ChangeDetailPage() {
   const [addingToPhase, setAddingToPhase] = useState<string | null>(null);
   const [newItemDesc, setNewItemDesc] = useState("");
   const [newItemCommand, setNewItemCommand] = useState("");
+  const [newItemHoldPoint, setNewItemHoldPoint] = useState(false);
 
   const loadAll = useCallback(async () => {
     try {
@@ -527,9 +528,11 @@ export default function ChangeDetailPage() {
         phase,
         description: newItemDesc.trim(),
         command: newItemCommand.trim() || undefined,
+        is_hold_point: newItemHoldPoint || undefined,
       });
       setNewItemDesc("");
       setNewItemCommand("");
+      setNewItemHoldPoint(false);
       // Keep the form open in the same phase so you can add multiple items
       await loadAll();
     } catch (err: unknown) {
@@ -1095,6 +1098,7 @@ export default function ChangeDetailPage() {
                           setAddingToPhase(null);
                           setNewItemDesc("");
                           setNewItemCommand("");
+                          setNewItemHoldPoint(false);
                         }
                       }}
                       autoFocus
@@ -1111,10 +1115,11 @@ export default function ChangeDetailPage() {
                           setAddingToPhase(null);
                           setNewItemDesc("");
                           setNewItemCommand("");
+                          setNewItemHoldPoint(false);
                         }
                       }}
                     />
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-3">
                       <button
                         onClick={() => handleAddChecklistItem(phase)}
                         disabled={!newItemDesc.trim()}
@@ -1122,13 +1127,23 @@ export default function ChangeDetailPage() {
                       >
                         Add
                       </button>
+                      <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={newItemHoldPoint}
+                          onChange={(e) => setNewItemHoldPoint(e.target.checked)}
+                          className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        🔒 Hold point
+                      </label>
                       <button
                         onClick={() => {
                           setAddingToPhase(null);
                           setNewItemDesc("");
                           setNewItemCommand("");
+                          setNewItemHoldPoint(false);
                         }}
-                        className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+                        className="ml-auto px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
                       >
                         Done
                       </button>
@@ -1143,6 +1158,7 @@ export default function ChangeDetailPage() {
                       setAddingToPhase(phase);
                       setNewItemDesc("");
                       setNewItemCommand("");
+                      setNewItemHoldPoint(false);
                     }}
                     className="mt-2 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
                   >
