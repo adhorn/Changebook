@@ -182,9 +182,9 @@ function ChecklistItemRow({
                   {formatDate(completion.completed_at)}
                 </span>
               </div>
-              <p className="text-gray-700">
-                Observed: {completion.observed_result}
-              </p>
+              <pre className="mt-1 bg-gray-50 rounded p-2 font-mono text-gray-700 whitespace-pre-wrap overflow-x-auto">
+                {completion.observed_result}
+              </pre>
               {completion.hold_point_verified_by && (
                 <p className="text-green-700">
                   Hold point verified by {completion.hold_point_verified_by}
@@ -248,14 +248,20 @@ function ChecklistItemRow({
                 <div className="mt-3 space-y-2 p-3 bg-white border border-blue-200 rounded-lg">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      What did you observe? *
+                      Result — paste output or describe what you observed *
                     </label>
                     <textarea
                       value={observedResult}
-                      onChange={(e) => setObservedResult(e.target.value)}
-                      rows={2}
-                      placeholder="Describe what you saw..."
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      onChange={(e) => {
+                        setObservedResult(e.target.value);
+                        // Auto-resize to fit content
+                        const ta = e.target;
+                        ta.style.height = "auto";
+                        ta.style.height = ta.scrollHeight + "px";
+                      }}
+                      rows={3}
+                      placeholder="$ kubectl get pods -n prod&#10;NAME           READY   STATUS&#10;api-7d8f9c     1/1     Running"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-2">
