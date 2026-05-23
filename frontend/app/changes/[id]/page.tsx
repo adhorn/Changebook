@@ -444,6 +444,7 @@ export default function ChangeDetailPage() {
   // New checklist item form — per-phase
   const [addingToPhase, setAddingToPhase] = useState<string | null>(null);
   const [newItemDesc, setNewItemDesc] = useState("");
+  const [newItemCommand, setNewItemCommand] = useState("");
 
   const loadAll = useCallback(async () => {
     try {
@@ -519,8 +520,10 @@ export default function ChangeDetailPage() {
       await api.addChecklistItem(id, {
         phase,
         description: newItemDesc.trim(),
+        command: newItemCommand.trim() || undefined,
       });
       setNewItemDesc("");
+      setNewItemCommand("");
       // Keep the form open in the same phase so you can add multiple items
       await loadAll();
     } catch (err: unknown) {
@@ -1069,27 +1072,43 @@ export default function ChangeDetailPage() {
                 {/* Per-phase add form — appears below the last item */}
                 {isDraft && isAddingHere && (
                   <div
-                    className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2"
                     ref={(el) => {
                       if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
                     }}
                   >
+                    <input
+                      type="text"
+                      value={newItemDesc}
+                      onChange={(e) => setNewItemDesc(e.target.value)}
+                      placeholder="Description — what to do..."
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !e.shiftKey) handleAddChecklistItem(phase);
+                        if (e.key === "Escape") {
+                          setAddingToPhase(null);
+                          setNewItemDesc("");
+                          setNewItemCommand("");
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <input
+                      type="text"
+                      value={newItemCommand}
+                      onChange={(e) => setNewItemCommand(e.target.value)}
+                      placeholder="Command (optional) — e.g. kubectl get pods -n prod"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-gray-900"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleAddChecklistItem(phase);
+                        if (e.key === "Escape") {
+                          setAddingToPhase(null);
+                          setNewItemDesc("");
+                          setNewItemCommand("");
+                        }
+                      }}
+                    />
                     <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={newItemDesc}
-                        onChange={(e) => setNewItemDesc(e.target.value)}
-                        placeholder="Description..."
-                        className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") handleAddChecklistItem(phase);
-                          if (e.key === "Escape") {
-                            setAddingToPhase(null);
-                            setNewItemDesc("");
-                          }
-                        }}
-                        autoFocus
-                      />
                       <button
                         onClick={() => handleAddChecklistItem(phase)}
                         disabled={!newItemDesc.trim()}
@@ -1101,6 +1120,7 @@ export default function ChangeDetailPage() {
                         onClick={() => {
                           setAddingToPhase(null);
                           setNewItemDesc("");
+                          setNewItemCommand("");
                         }}
                         className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
                       >
@@ -1116,6 +1136,7 @@ export default function ChangeDetailPage() {
                     onClick={() => {
                       setAddingToPhase(phase);
                       setNewItemDesc("");
+                      setNewItemCommand("");
                     }}
                     className="mt-2 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
                   >
