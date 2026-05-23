@@ -441,9 +441,8 @@ export default function ChangeDetailPage() {
   const [dupTitle, setDupTitle] = useState("");
   const [duplicating, setDuplicating] = useState(false);
 
-  // New checklist item form
-  const [showAddItem, setShowAddItem] = useState(false);
-  const [newItemPhase, setNewItemPhase] = useState("pre_flight");
+  // New checklist item form — per-phase
+  const [addingToPhase, setAddingToPhase] = useState<string | null>(null);
   const [newItemDesc, setNewItemDesc] = useState("");
 
   const loadAll = useCallback(async () => {
@@ -514,15 +513,15 @@ export default function ChangeDetailPage() {
     }
   }
 
-  async function handleAddChecklistItem() {
+  async function handleAddChecklistItem(phase: string) {
     if (!newItemDesc.trim()) return;
     try {
       await api.addChecklistItem(id, {
-        phase: newItemPhase,
+        phase,
         description: newItemDesc.trim(),
       });
       setNewItemDesc("");
-      setShowAddItem(false);
+      // Keep the form open in the same phase so you can add multiple items
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -1032,53 +1031,12 @@ export default function ChangeDetailPage() {
 
         {/* Three-phase Checklist */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium text-gray-900">Checklist</h2>
-            {isDraft && (
-              <button
-                onClick={() => setShowAddItem(!showAddItem)}
-                className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                {showAddItem ? "Cancel" : "+ Add Item"}
-              </button>
-            )}
-          </div>
-
-          {showAddItem && isDraft && (
-            <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2">
-              <div className="grid grid-cols-4 gap-2">
-                <select
-                  value={newItemPhase}
-                  onChange={(e) => setNewItemPhase(e.target.value)}
-                  className="col-span-1 px-2 py-1.5 border border-gray-300 rounded text-xs"
-                >
-                  {PHASE_ORDER.map((p) => (
-                    <option key={p} value={p}>
-                      {PHASE_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="text"
-                  value={newItemDesc}
-                  onChange={(e) => setNewItemDesc(e.target.value)}
-                  placeholder="Description..."
-                  className="col-span-2 px-2 py-1.5 border border-gray-300 rounded text-xs"
-                />
-                <button
-                  onClick={handleAddChecklistItem}
-                  disabled={!newItemDesc.trim()}
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded hover:bg-gray-800 disabled:opacity-50"
-                >
-                  Add
-                </button>
-              </div>
-            </div>
-          )}
+          <h2 className="text-lg font-medium text-gray-900">Checklist</h2>
 
           {PHASE_ORDER.map((phase) => {
             const items = checklistByPhase[phase] || [];
             if (items.length === 0 && !isDraft) return null;
+            const isAddingHere = addingToPhase === phase;
 
             return (
               <div key={phase}>
@@ -1091,7 +1049,7 @@ export default function ChangeDetailPage() {
                     </span>
                   )}
                 </h3>
-                {items.length === 0 ? (
+                {items.length === 0 && !isAddingHere ? (
                   <p className="text-xs text-gray-400 italic">No items yet</p>
                 ) : (
                   <div className="space-y-2">
@@ -1106,6 +1064,63 @@ export default function ChangeDetailPage() {
                       />
                     ))}
                   </div>
+                )}
+
+                {/* Per-phase add form — appears below the last item */}
+                {isDraft && isAddingHere && (
+                  <div
+                    className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                    ref={(el) => {
+                      if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                    }}
+                  >
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newItemDesc}
+                        onChange={(e) => setNewItemDesc(e.target.value)}
+                        placeholder="Description..."
+                        className="flex-1 px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAddChecklistItem(phase);
+                          if (e.key === "Escape") {
+                            setAddingToPhase(null);
+                            setNewItemDesc("");
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleAddChecklistItem(phase)}
+                        disabled={!newItemDesc.trim()}
+                        className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded hover:bg-gray-800 disabled:opacity-50"
+                      >
+                        Add
+                      </button>
+                      <button
+                        onClick={() => {
+                          setAddingToPhase(null);
+                          setNewItemDesc("");
+                        }}
+                        className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Add button at the bottom of each phase */}
+                {isDraft && !isAddingHere && (
+                  <button
+                    onClick={() => {
+                      setAddingToPhase(phase);
+                      setNewItemDesc("");
+                    }}
+                    className="mt-2 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+                  >
+                    + Add item
+                  </button>
                 )}
               </div>
             );
