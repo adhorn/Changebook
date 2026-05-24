@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Change, ChangeStatus } from "@/lib/api";
 
@@ -43,6 +44,7 @@ function formatDate(iso: string): string {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [changes, setChanges] = useState<Change[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +166,7 @@ export default function Home() {
                   <tr
                     key={change.id}
                     className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => router.push(`/changes/${change.id}`)}
                   >
                     <td className="px-6 py-4">
                       <Link href={`/changes/${change.id}`} className="block">
