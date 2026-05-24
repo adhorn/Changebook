@@ -443,6 +443,8 @@ export default function ChangeDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [transitioning, setTransitioning] = useState(false);
+  const [showAbort, setShowAbort] = useState(false);
+  const [abortReason, setAbortReason] = useState("");
   const [newReviewer, setNewReviewer] = useState("");
   const [preflightExpanded, setPreflightExpanded] = useState(false);
   const [preflightEditing, setPreflightEditing] = useState(false);
@@ -494,12 +496,14 @@ export default function ChangeDetailPage() {
     }
   }
 
-  async function handleTransition(target: ChangeStatus) {
+  async function handleTransition(target: ChangeStatus, reason?: string) {
     if (!change) return;
     setTransitioning(true);
     setError(null);
     try {
-      await api.transitionChange(change.id, target, change.author_name);
+      await api.transitionChange(change.id, target, change.author_name, reason);
+      setShowAbort(false);
+      setAbortReason("");
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Transition failed");
@@ -748,11 +752,10 @@ export default function ChangeDetailPage() {
               </button>
               {!isTerminal && (
                 <button
-                  onClick={() => handleTransition("aborted")}
-                  disabled={transitioning}
-                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                  onClick={() => setShowAbort(!showAbort)}
+                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50"
                 >
-                  Abort
+                  {showAbort ? "Cancel" : "Abort"}
                 </button>
               )}
               {transitions.map((t) => (
@@ -771,6 +774,41 @@ export default function ChangeDetailPage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        {/* Abort confirmation */}
+        {showAbort && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
+            <h2 className="text-sm font-medium text-red-900">
+              Abort this change
+            </h2>
+            <textarea
+              value={abortReason}
+              onChange={(e) => setAbortReason(e.target.value)}
+              rows={2}
+              placeholder="Why is this change being aborted?"
+              className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-red-500"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleTransition("aborted", abortReason.trim() || undefined)}
+                disabled={transitioning || !abortReason.trim()}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {transitioning ? "Aborting..." : "Confirm Abort"}
+              </button>
+              <button
+                onClick={() => {
+                  setShowAbort(false);
+                  setAbortReason("");
+                }}
+                className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
             {error}

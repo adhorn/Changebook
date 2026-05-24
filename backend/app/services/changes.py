@@ -202,7 +202,8 @@ def duplicate_change(
 
 
 def transition_status(
-    db: Session, change: Change, new_status: ChangeStatus, actor_name: str
+    db: Session, change: Change, new_status: ChangeStatus, actor_name: str,
+    reason: str | None = None,
 ) -> Change:
     old_status = change.status
     _validate_transition(old_status, new_status)
@@ -282,12 +283,20 @@ def transition_status(
 
     change.status = new_status
 
+    description = f"Status changed from {old_status.value} to {new_status.value}"
+    if reason:
+        description += f" — {reason}"
+
+    event_data: dict = {"old_status": old_status.value, "new_status": new_status.value}
+    if reason:
+        event_data["reason"] = reason
+
     audit = AuditEvent(
         change_id=change.id,
         event_type="status_changed",
         actor_name=actor_name,
-        description=f"Status changed from {old_status.value} to {new_status.value}",
-        event_data={"old_status": old_status.value, "new_status": new_status.value},
+        description=description,
+        event_data=event_data,
     )
     db.add(audit)
     db.commit()

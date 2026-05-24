@@ -175,11 +175,17 @@ export const api = {
   updateChange: (id: string, data: Record<string, unknown>) =>
     request<Change>(`/changes/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 
-  transitionChange: (id: string, targetStatus: ChangeStatus, actorName: string) =>
-    request<Change>(
-      `/changes/${id}/transition?target_status=${targetStatus}&actor_name=${encodeURIComponent(actorName)}`,
+  transitionChange: (id: string, targetStatus: ChangeStatus, actorName: string, reason?: string) => {
+    const params = new URLSearchParams({
+      target_status: targetStatus,
+      actor_name: actorName,
+    });
+    if (reason) params.set("reason", reason);
+    return request<Change>(
+      `/changes/${id}/transition?${params}`,
       { method: "POST" }
-    ),
+    );
+  },
 
   duplicateChange: (id: string, data: { author_name: string; title?: string; environment_id?: string }) =>
     request<Change>(`/changes/${id}/duplicate`, { method: "POST", body: JSON.stringify(data) }),

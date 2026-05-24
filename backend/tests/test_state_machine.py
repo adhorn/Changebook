@@ -291,3 +291,67 @@ class TestStalenessWarning:
             params={"target_status": "executing", "actor_name": "Adrian Hornsby"},
         )
         assert resp.status_code == 200
+
+
+class TestAbortReason:
+    """Abort transitions can include a reason, stored in the audit trail."""
+
+    def test_abort_with_reason(self, client, sample_change_data, db):
+        """Aborting with a reason records it in the audit event."""
+        change_id = _create_change_with_preflight(client, sample_change_data)
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={
+                "target_status": "aborted",
+                "actor_name": "Adrian Hornsby",
+                "reason": "Customer requested postponement due to quarter-end freeze",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "aborted"
+
+        from app.models.audit import AuditEvent
+
+        events = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.change_id == change_id,
+                AuditEvent.event_type == "status_changed",
+            )
+            .all()
+        )
+        abort_event = [e for e in events if "aborted" in e.description]
+        assert len(abort_event) == 1
+        assert "quarter-end freeze" in abort_event[0].description
+        assert abort_event[0].event_data["reason"] == (
+            "Customer requested postponement due to quarter-end freeze"
+        )
+
+    def test_abort_without_reason(self, client, sample_change_data, db):
+        """Aborting without a reason still works — reason is optional."""
+        change_id = _create_change_with_preflight(client, sample_change_data)
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={
+                "target_status": "aborted",
+                "actor_name": "Adrian Hornsby",
+            },
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "aborted"
+
+        from app.models.audit import AuditEvent
+
+        events = (
+            db.query(AuditEvent)
+            .filter(
+                AuditEvent.change_id == change_id,
+                AuditEvent.event_type == "status_changed",
+            )
+            .all()
+        )
+        abort_event = [e for e in events if "aborted" in e.description]
+        assert len(abort_event) == 1
+        assert "reason" not in abort_event[0].event_data

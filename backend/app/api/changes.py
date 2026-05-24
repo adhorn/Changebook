@@ -160,13 +160,16 @@ def transition_change(
     change_id: uuid.UUID,
     target_status: ChangeStatus,
     actor_name: str,
+    reason: str | None = None,
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
     try:
-        change = change_service.transition_status(db, change, target_status, actor_name)
+        change = change_service.transition_status(
+            db, change, target_status, actor_name, reason=reason,
+        )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return change
