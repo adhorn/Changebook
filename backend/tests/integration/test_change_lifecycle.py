@@ -144,9 +144,7 @@ class TestFullChangeLifecycle:
         transitions = [
             ("approved", "Reviewer approved"),
             ("executing", "Start execution"),
-            ("awaiting_verification", "Execution complete"),
-            ("verified", "Verification passed"),
-            ("closed", "Close the change"),
+            ("done", "Mark as done"),
         ]
 
         for target_status, description in transitions:
@@ -157,11 +155,11 @@ class TestFullChangeLifecycle:
             assert resp.status_code == 200, f"Failed at '{description}': {resp.json()}"
             assert resp.json()["status"] == target_status
 
-        # 7. Confirm the change is closed
+        # 7. Confirm the change is done
         final = client.get(f"/api/v1/changes/{change_id}").json()
-        assert final["status"] == "closed"
+        assert final["status"] == "done"
 
-        # 8. Confirm closed changes cannot transition
+        # 8. Confirm done changes cannot transition back to draft
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
             params={"target_status": "draft"},
