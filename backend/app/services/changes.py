@@ -274,6 +274,10 @@ def transition_status(
 
     change.status = new_status
 
+    # Store abort reason on the change itself for easy display
+    if new_status == ChangeStatus.ABORTED and reason:
+        change.abort_reason = reason
+
     description = f"Status changed from {old_status.value} to {new_status.value}"
     if reason:
         description += f" — {reason}"

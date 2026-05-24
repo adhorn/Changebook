@@ -310,6 +310,10 @@ class TestAbortReason:
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "aborted"
+        assert (
+            resp.json()["abort_reason"]
+            == "Customer requested postponement due to quarter-end freeze"
+        )
 
         from app.models.audit import AuditEvent
 
@@ -340,6 +344,7 @@ class TestAbortReason:
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "aborted"
+        assert resp.json()["abort_reason"] is None
 
         from app.models.audit import AuditEvent
 

@@ -1076,6 +1076,14 @@ export default function ChangeDetailPage() {
           </div>
         )}
 
+        {/* Abort reason banner */}
+        {change.status === "aborted" && change.abort_reason && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h3 className="text-sm font-medium text-red-900">Abort reason</h3>
+            <p className="mt-1 text-sm text-red-700 whitespace-pre-wrap">{change.abort_reason}</p>
+          </div>
+        )}
+
         {/* Duplicate form */}
         {showDuplicate && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
