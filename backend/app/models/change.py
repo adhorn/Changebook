@@ -1,7 +1,8 @@
 import enum
 import uuid
+from datetime import datetime
 
-from sqlalchemy import Enum, ForeignKey, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, PortableJSON, PortableUUID, TimestampMixin, UUIDMixin
@@ -12,10 +13,22 @@ class ChangeStatus(enum.StrEnum):
     IN_REVIEW = "in_review"
     APPROVED = "approved"
     EXECUTING = "executing"
-    AWAITING_VERIFICATION = "awaiting_verification"
-    VERIFIED = "verified"
-    CLOSED = "closed"
+    DONE = "done"
     ABORTED = "aborted"
+
+
+# Predefined defence tags. Operators pick from this list. No free-text.
+ALLOWED_DEFENCE_TAGS = [
+    "monitoring",
+    "alerting",
+    "security",
+    "access_control",
+    "DR",
+    "backup",
+    "networking",
+    "database",
+    "application",
+]
 
 
 class Change(UUIDMixin, TimestampMixin, Base):
@@ -28,28 +41,66 @@ class Change(UUIDMixin, TimestampMixin, Base):
         Enum(ChangeStatus), default=ChangeStatus.DRAFT, nullable=False
     )
 
-    # Ownership
-    team_id: Mapped[uuid.UUID] = mapped_column(PortableUUID, ForeignKey("teams.id"), nullable=False)
+    # Who and where — one customer, one service, one environment per change
+    customer_id: Mapped[uuid.UUID] = mapped_column(
+        PortableUUID, ForeignKey("customers.id"), nullable=False
+    )
+    service_id: Mapped[uuid.UUID] = mapped_column(
+        PortableUUID, ForeignKey("services.id"), nullable=False
+    )
+    environment_id: Mapped[uuid.UUID] = mapped_column(
+        PortableUUID, ForeignKey("environments.id"), nullable=False
+    )
+
+    # Author (free text in v1, derived from SSO later)
     author_name: Mapped[str] = mapped_column(String(255), nullable=False)
 
-    # Environments targeted by this change (list of UUID strings as JSON)
-    environment_ids: Mapped[list | None] = mapped_column(PortableJSON, nullable=True)
-
-    # Pre-flight answers stored as PortableJSON for flexibility
+    # Pre-flight answers stored as JSONB for flexibility
     preflight_answers: Mapped[dict | None] = mapped_column(PortableJSON, nullable=True)
 
-    # Defence tags (monitoring, alerting, security, access control, DR, backup)
+    # Tracks which version of the question schema the answers were written against
+    preflight_schema_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
+    # When pre-flight answers were last written (for 24h staleness check)
+    preflight_answered_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    # Defence tags — validated against ALLOWED_DEFENCE_TAGS
     defence_tags: Mapped[list | None] = mapped_column(PortableJSON, nullable=True)
 
+    # Duplicate flow — reference to the change this was cloned from
+    cloned_from: Mapped[uuid.UUID | None] = mapped_column(
+        PortableUUID, ForeignKey("changes.id"), nullable=True
+    )
+
     # Relationships
-    team: Mapped["Team"] = relationship(back_populates="changes")  # noqa: F821
-    steps: Mapped[list["Step"]] = relationship(  # noqa: F821
-        back_populates="change", order_by="Step.order"
+    customer: Mapped["Customer"] = relationship(foreign_keys=[customer_id])  # noqa: F821
+    service: Mapped["Service"] = relationship(foreign_keys=[service_id])  # noqa: F821
+    environment: Mapped["Environment"] = relationship(  # noqa: F821
+        foreign_keys=[environment_id]
+    )
+    checklist_items: Mapped[list["ChecklistItem"]] = relationship(  # noqa: F821
+        back_populates="change", order_by="ChecklistItem.phase, ChecklistItem.order"
     )
     reviews: Mapped[list["Review"]] = relationship(back_populates="change")  # noqa: F821
-    verifications: Mapped[list["Verification"]] = relationship(  # noqa: F821
-        back_populates="change"
-    )
     audit_events: Mapped[list["AuditEvent"]] = relationship(  # noqa: F821
         back_populates="change"
     )
+
+    # Derived properties for response serialisation
+    @property
+    def customer_name(self) -> str | None:
+        return self.customer.name if self.customer else None
+
+    @property
+    def service_name(self) -> str | None:
+        return self.service.name if self.service else None
+
+    @property
+    def environment_name(self) -> str | None:
+        return self.environment.name if self.environment else None
+
+    @property
+    def environment_platform(self) -> str | None:
+        return self.environment.platform if self.environment else None

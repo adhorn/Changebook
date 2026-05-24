@@ -10,6 +10,9 @@ class Organisation(UUIDMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
 
     teams: Mapped[list["Team"]] = relationship(back_populates="organisation")  # noqa: F821
+    customers: Mapped[list["Customer"]] = relationship(  # noqa: F821
+        back_populates="organisation"
+    )
     environments: Mapped[list["Environment"]] = relationship(  # noqa: F821
         back_populates="organisation"
     )

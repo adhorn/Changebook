@@ -72,25 +72,36 @@ def client(db):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app) as c:
+    with TestClient(
+        app,
+        headers={
+            "X-User-Email": "test@changebook.dev",
+            "X-User-Name": "Test User",
+        },
+    ) as c:
         yield c
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def org_and_team(client):
-    """Create a default organisation and team."""
-    org = client.post("/api/v1/organisations", json={"name": "Integration Test Org"})
-    org_id = org.json()["id"]
-
-    team = client.post("/api/v1/teams", json={"name": "Platform Team", "organisation_id": org_id})
-    team_id = team.json()["id"]
-
-    return {"org_id": org_id, "team_id": team_id}
+def customer_and_service(client):
+    """Create a customer with one service. Organisation is auto-injected."""
+    resp = client.post(
+        "/api/v1/customers",
+        json={
+            "name": "SimCorp A/S",
+            "services": [{"name": "Data Platform"}],
+        },
+    )
+    cust_data = resp.json()
+    return {
+        "customer_id": cust_data["id"],
+        "service_id": cust_data["services"][0]["id"],
+    }
 
 
 @pytest.fixture
-def environment(client, org_and_team):
+def environment(client):
     """Create a test environment."""
     resp = client.post(
         "/api/v1/environments",
@@ -98,7 +109,6 @@ def environment(client, org_and_team):
             "name": "PROD-EU-01",
             "platform": "Azure",
             "description": "Production EU client 1",
-            "organisation_id": org_and_team["org_id"],
         },
     )
     return resp.json()

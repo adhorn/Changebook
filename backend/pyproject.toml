@@ -37,6 +37,12 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+# Pre-flight question definitions contain long natural-language strings
+"app/models/preflight.py" = ["E501"]
+# Realistic test data contains long strings (commands, descriptions, outputs)
+"tests/test_realistic_content.py" = ["E501"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

@@ -5,8 +5,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
+from app.api.auth import router as auth_router
 from app.api.changes import router as changes_router
 from app.api.organisations import router as organisations_router
+from app.api.preflight import router as preflight_router
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -35,8 +37,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(changes_router, prefix="/api/v1")
 app.include_router(organisations_router, prefix="/api/v1")
+app.include_router(preflight_router, prefix="/api/v1")
+
+
+@app.on_event("startup")
+def create_tables():
+    import app.models  # noqa: F401 — ensure all models are imported
+    from app.core.database import engine
+    from app.models.base import Base
+
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception:
+        # In tests, the real DB may not be available — tables are created
+        # by the test fixtures using an in-memory SQLite engine instead.
+        logger.debug("Could not create tables on startup (expected in tests)")
 
 
 @app.get("/health")

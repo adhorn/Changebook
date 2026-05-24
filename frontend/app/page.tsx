@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Change, ChangeStatus } from "@/lib/api";
+import UserSwitcher from "@/components/UserSwitcher";
 
 const STATUS_COLORS: Record<ChangeStatus, string> = {
   draft: "bg-gray-100 text-gray-700",
   in_review: "bg-yellow-100 text-yellow-800",
   approved: "bg-blue-100 text-blue-800",
   executing: "bg-orange-100 text-orange-800",
-  awaiting_verification: "bg-purple-100 text-purple-800",
-  verified: "bg-green-100 text-green-800",
-  closed: "bg-green-50 text-green-600",
+  done: "bg-green-100 text-green-800",
   aborted: "bg-red-100 text-red-700",
 };
 
@@ -20,18 +20,16 @@ const STATUS_LABELS: Record<ChangeStatus, string> = {
   in_review: "In Review",
   approved: "Approved",
   executing: "Executing",
-  awaiting_verification: "Awaiting Verification",
-  verified: "Verified",
-  closed: "Closed",
+  done: "Done",
   aborted: "Aborted",
 };
 
 function StatusBadge({ status }: { status: ChangeStatus }) {
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[status]}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[status] || "bg-gray-100 text-gray-700"}`}
     >
-      {STATUS_LABELS[status]}
+      {STATUS_LABELS[status] || status}
     </span>
   );
 }
@@ -47,13 +45,17 @@ function formatDate(iso: string): string {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [changes, setChanges] = useState<Change[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  useEffect(() => {
+  function loadChanges(params?: Record<string, string>) {
+    setLoading(true);
     api
-      .listChanges()
+      .listChanges(params)
       .then((res) => {
         setChanges(res.data);
         setLoading(false);
@@ -62,7 +64,14 @@ export default function Home() {
         setError(err.message);
         setLoading(false);
       });
-  }, []);
+  }
+
+  useEffect(() => {
+    const params: Record<string, string> = {};
+    if (statusFilter) params.status = statusFilter;
+    if (searchQuery) params.title_search = searchQuery;
+    loadChanges(params);
+  }, [statusFilter, searchQuery]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -72,20 +81,46 @@ export default function Home() {
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Changebook</h1>
               <p className="text-sm text-gray-500">
-                Production changes — from plan to verification
+                Production changes — think, plan, execute, verify
               </p>
             </div>
-            <Link
-              href="/changes/new"
-              className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              New Change
-            </Link>
+            <div className="flex items-center gap-3">
+              <UserSwitcher />
+              <Link
+                href="/changes/new"
+                className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                New Change
+              </Link>
+            </div>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Filters */}
+        <div className="flex gap-3 mb-6">
+          <input
+            type="text"
+            placeholder="Search by title..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent w-64"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+          >
+            <option value="">All statuses</option>
+            {Object.entries(STATUS_LABELS).map(([val, label]) => (
+              <option key={val} value={val}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {loading && (
           <div className="text-center py-12 text-gray-500">Loading changes...</div>
         )}
@@ -135,15 +170,19 @@ export default function Home() {
                   <tr
                     key={change.id}
                     className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => router.push(`/changes/${change.id}`)}
                   >
                     <td className="px-6 py-4">
                       <Link href={`/changes/${change.id}`} className="block">
                         <div className="text-sm font-medium text-gray-900">
                           {change.title}
                         </div>
-                        {change.description && (
-                          <div className="text-sm text-gray-500 truncate max-w-md">
-                            {change.description}
+                        {(change.customer_name || change.environment_name) && (
+                          <div className="text-xs text-gray-400 mt-0.5">
+                            {[change.customer_name, change.service_name].filter(Boolean).join(" / ")}
+                            {change.environment_name && (
+                              <> → <span className="text-gray-500 font-medium">{change.environment_name}</span></>
+                            )}
                           </div>
                         )}
                         {change.defence_tags && change.defence_tags.length > 0 && (

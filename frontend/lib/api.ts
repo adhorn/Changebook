@@ -1,9 +1,12 @@
+import { getAuthHeaders } from "./auth";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}/api/v1${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
       ...options?.headers,
     },
     ...options,
@@ -17,6 +20,18 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+async function requestText(path: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+  return res.text();
+}
+
 // --- Types ---
 
 export type ChangeStatus =
@@ -24,9 +39,7 @@ export type ChangeStatus =
   | "in_review"
   | "approved"
   | "executing"
-  | "awaiting_verification"
-  | "verified"
-  | "closed"
+  | "done"
   | "aborted";
 
 export interface Change {
@@ -34,28 +47,21 @@ export interface Change {
   title: string;
   description: string | null;
   status: ChangeStatus;
-  team_id: string;
+  customer_id: string;
+  service_id: string;
+  environment_id: string;
   author_name: string;
-  environment_ids: string[] | null;
   preflight_answers: Record<string, string> | null;
+  preflight_schema_version: string | null;
   defence_tags: string[] | null;
+  cloned_from: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface Step {
-  id: string;
-  order: number;
-  description: string;
-  expected_outcome: string | null;
-  rollback_action: string | null;
-  script: string | null;
-  is_hold_point: boolean;
-  created_at: string;
-}
-
-export interface ChangeDetail extends Change {
-  steps: Step[];
+  audit_event_count?: number;
+  customer_name: string | null;
+  service_name: string | null;
+  environment_name: string | null;
+  environment_platform: string | null;
 }
 
 export interface ChangeListResponse {
@@ -63,17 +69,82 @@ export interface ChangeListResponse {
   meta: { total: number; limit: number; offset: number };
 }
 
-export interface Organisation {
+export interface ChecklistItem {
   id: string;
-  name: string;
+  change_id: string;
+  phase: "pre_flight" | "execution" | "verification";
+  order: number;
+  description: string;
+  command: string | null;
+  expected_outcome: string | null;
+  rollback_action: string | null;
+  is_hold_point: boolean;
+  created_at: string;
+  completion: ChecklistCompletion | null;
+}
+
+export interface ChecklistCompletion {
+  id: string;
+  item_id: string;
+  observed_result: string;
+  status: "completed" | "flagged" | "skipped_with_justification";
+  completed_by: string;
+  completed_at: string;
+  hold_point_verified_by: string | null;
+  hold_point_verified_at: string | null;
+}
+
+export interface Review {
+  id: string;
+  change_id: string;
+  reviewer_name: string;
+  decision: "pending" | "approved" | "changes_requested" | "blocked";
+  comment: string | null;
   created_at: string;
 }
 
-export interface Team {
+export interface PreflightQuestion {
+  key: string;
+  label: string;
+  type: string;
+  required: boolean;
+  description: string;
+  example: string;
+}
+
+export interface PreflightSection {
+  title: string;
+  framing: string;
+  questions: PreflightQuestion[];
+}
+
+export interface PreflightSchema {
+  schema_version: string;
+  sections: PreflightSection[];
+}
+
+export interface ExecutionStatus {
+  current_phase: string | null;
+  total_items: number;
+  completed_items: number;
+  next_item_id: string | null;
+  all_complete: boolean;
+  phases: Record<string, { total: number; completed: number; complete: boolean }>;
+}
+
+export interface Customer {
   id: string;
   name: string;
+  description: string | null;
   organisation_id: string;
-  created_at: string;
+  services: Service[];
+}
+
+export interface Service {
+  id: string;
+  name: string;
+  description: string | null;
+  customer_id: string;
 }
 
 export interface Environment {
@@ -82,78 +153,115 @@ export interface Environment {
   platform: string | null;
   description: string | null;
   organisation_id: string;
-  created_at: string;
+  customer_id: string | null;
 }
 
 // --- API calls ---
 
 export const api = {
   // Changes
-  listChanges: (params?: { team_id?: string; status?: ChangeStatus }) => {
-    const query = new URLSearchParams();
-    if (params?.team_id) query.set("team_id", params.team_id);
-    if (params?.status) query.set("status", params.status);
+  listChanges: (params?: Record<string, string>) => {
+    const query = new URLSearchParams(params);
     const qs = query.toString();
     return request<ChangeListResponse>(`/changes${qs ? `?${qs}` : ""}`);
   },
 
-  getChange: (id: string) => request<ChangeDetail>(`/changes/${id}`),
+  getChange: (id: string) => request<Change>(`/changes/${id}`),
 
   createChange: (data: {
     title: string;
     description?: string;
-    team_id: string;
-    author_name: string;
-    environment_ids?: string[];
+    customer_id: string;
+    service_id: string;
+    environment_id: string;
     preflight_answers?: Record<string, string>;
     defence_tags?: string[];
-    steps?: {
-      description: string;
-      expected_outcome?: string;
-      rollback_action?: string;
-      script?: string;
-      is_hold_point?: boolean;
-    }[];
-  }) => request<ChangeDetail>("/changes", { method: "POST", body: JSON.stringify(data) }),
+  }) => request<Change>("/changes", { method: "POST", body: JSON.stringify(data) }),
 
-  transitionChange: (id: string, targetStatus: ChangeStatus, actorName: string) =>
-    request<ChangeDetail>(
-      `/changes/${id}/transition?target_status=${targetStatus}&actor_name=${encodeURIComponent(actorName)}`,
+  updateChange: (id: string, data: Record<string, unknown>) =>
+    request<Change>(`/changes/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+
+  transitionChange: (id: string, targetStatus: ChangeStatus, reason?: string) => {
+    const params = new URLSearchParams({
+      target_status: targetStatus,
+    });
+    if (reason) params.set("reason", reason);
+    return request<Change>(
+      `/changes/${id}/transition?${params}`,
       { method: "POST" }
-    ),
-
-  // Organisations
-  listOrganisations: () => request<Organisation[]>("/organisations"),
-  createOrganisation: (name: string) =>
-    request<Organisation>("/organisations", {
-      method: "POST",
-      body: JSON.stringify({ name }),
-    }),
-
-  // Teams
-  listTeams: (organisationId?: string) => {
-    const qs = organisationId ? `?organisation_id=${organisationId}` : "";
-    return request<Team[]>(`/teams${qs}`);
+    );
   },
-  createTeam: (name: string, organisationId: string) =>
-    request<Team>("/teams", {
-      method: "POST",
-      body: JSON.stringify({ name, organisation_id: organisationId }),
-    }),
 
-  // Environments
-  listEnvironments: (organisationId?: string) => {
-    const qs = organisationId ? `?organisation_id=${organisationId}` : "";
-    return request<Environment[]>(`/environments${qs}`);
-  },
-  createEnvironment: (data: {
-    name: string;
-    platform?: string;
-    description?: string;
-    organisation_id: string;
+  duplicateChange: (id: string, data: { title?: string; environment_id?: string }) =>
+    request<Change>(`/changes/${id}/duplicate`, { method: "POST", body: JSON.stringify(data) }),
+
+  exportMarkdown: (id: string) => requestText(`/changes/${id}/export/markdown`),
+
+  // Preflight
+  getPreflightQuestions: () => request<PreflightSchema>("/preflight-questions"),
+
+  // Checklist
+  listChecklist: (changeId: string) =>
+    request<ChecklistItem[]>(`/changes/${changeId}/checklist`),
+
+  addChecklistItem: (changeId: string, data: {
+    phase: string;
+    description: string;
+    command?: string;
+    expected_outcome?: string;
+    rollback_action?: string;
+    is_hold_point?: boolean;
   }) =>
-    request<Environment>("/environments", {
+    request<ChecklistItem>(`/changes/${changeId}/checklist`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
+
+  deleteChecklistItem: (changeId: string, itemId: string) =>
+    fetch(`${API_BASE}/api/v1/changes/${changeId}/checklist/${itemId}`, {
+      method: "DELETE",
+      headers: { ...getAuthHeaders() },
+    }),
+
+  // Execution
+  completeItem: (changeId: string, itemId: string, data: {
+    observed_result: string;
+    status: string;
+  }) =>
+    request<ChecklistCompletion>(`/changes/${changeId}/checklist/${itemId}/complete`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  verifyHoldPoint: (changeId: string, itemId: string) =>
+    request<ChecklistCompletion>(`/changes/${changeId}/checklist/${itemId}/hold-point-verify`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+
+  getExecutionStatus: (changeId: string) =>
+    request<ExecutionStatus>(`/changes/${changeId}/execution-status`),
+
+  // Reviews
+  listReviews: (changeId: string) =>
+    request<Review[]>(`/changes/${changeId}/reviewers`),
+
+  assignReviewer: (changeId: string) =>
+    request<Review>(`/changes/${changeId}/reviewers`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    }),
+
+  submitDecision: (changeId: string, reviewId: string, decision: string, comment?: string) =>
+    request<Review>(`/changes/${changeId}/reviewers/${reviewId}/decision`, {
+      method: "POST",
+      body: JSON.stringify({ decision, comment }),
+    }),
+
+  // Customers
+  listCustomers: () => request<Customer[]>("/customers"),
+  getCustomer: (id: string) => request<Customer>(`/customers/${id}`),
+
+  // Environments
+  listEnvironments: () => request<Environment[]>("/environments"),
 };
