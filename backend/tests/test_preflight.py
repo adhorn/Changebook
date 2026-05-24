@@ -211,18 +211,18 @@ class TestPreflightValidationOnTransition:
         return {key: f"Answer for {key}" for key in keys}
 
     def test_cannot_submit_without_answers(self, client, sample_change_data):
-        """A change with no pre-flight answers cannot move to in_review."""
+        """A change with no change profile cannot move to in_review."""
         change_id = self._create_change(client, sample_change_data)
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 422
-        assert "pre-flight" in resp.json()["detail"].lower()
+        assert "change profile" in resp.json()["detail"].lower()
 
     def test_cannot_submit_with_partial_answers(self, client, sample_change_data):
-        """A change with incomplete pre-flight answers cannot move to in_review."""
+        """A change with incomplete change profile cannot move to in_review."""
         change_id = self._create_change(
             client,
             sample_change_data,
@@ -233,10 +233,10 @@ class TestPreflightValidationOnTransition:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 422
-        assert "pre-flight" in resp.json()["detail"].lower()
+        assert "change profile" in resp.json()["detail"].lower()
 
     def test_cannot_submit_with_empty_string_answers(self, client, sample_change_data):
         """Empty string answers don't count — the operator must actually write something."""
@@ -247,7 +247,7 @@ class TestPreflightValidationOnTransition:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 422
 
@@ -266,7 +266,7 @@ class TestPreflightValidationOnTransition:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "in_review"
@@ -277,7 +277,7 @@ class TestPreflightValidationOnTransition:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "aborted", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "aborted"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "aborted"

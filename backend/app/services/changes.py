@@ -208,12 +208,11 @@ def transition_status(
 
     # Gates on transition to in_review
     if new_status == ChangeStatus.IN_REVIEW:
-        # Gate 1: all required pre-flight answers must be filled
+        # Gate 1: all required change profile answers must be filled
         missing_answers = validate_preflight_completeness(change.preflight_answers)
         if missing_answers:
             raise ValueError(
-                f"Cannot submit for review — incomplete pre-flight answers. "
-                f"Missing: {missing_answers}"
+                f"Cannot submit for review — incomplete change profile. Missing: {missing_answers}"
             )
 
         # Gate 2: all three phases must have at least one checklist item
@@ -263,8 +262,8 @@ def transition_status(
                 event_type="staleness_warning",
                 actor_name=actor_name,
                 description=(
-                    f"Pre-flight answers are {age.total_seconds() / 3600:.0f}h old "
-                    f"(threshold: 24h). Operator acknowledged stale pre-flight."
+                    f"Change profile is {age.total_seconds() / 3600:.0f}h old "
+                    f"(threshold: 24h). Operator acknowledged stale change profile."
                 ),
                 event_data={
                     "preflight_answered_at": change.preflight_answered_at.isoformat(),

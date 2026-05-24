@@ -4,6 +4,10 @@ Reviewers are assigned to a change. All must approve before the change
 can transition to approved. Any edit after approval resets all reviews.
 """
 
+from tests.conftest import BOB, JANE
+
+VP_RISK = {"X-User-Email": "vprisk@changebook.dev", "X-User-Name": "VP Risk"}
+
 
 def _complete_preflight(client):
     resp = client.get("/api/v1/preflight-questions")
@@ -21,7 +25,6 @@ def _create_review_ready_change(client, sample_change_data):
         "/api/v1/changes",
         json={
             "title": "Review test change",
-            "author_name": "Adrian Hornsby",
             **sample_change_data,
             "preflight_answers": _complete_preflight(client),
         },
@@ -39,7 +42,7 @@ def _submit_for_review(client, change_id):
     """Transition a change to in_review."""
     client.post(
         f"/api/v1/changes/{change_id}/transition",
-        params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+        params={"target_status": "in_review"},
     )
 
 
@@ -120,6 +123,7 @@ class TestSubmitReview:
                 "decision": "approved",
                 "comment": "Looks good, well thought out.",
             },
+            headers=JANE,
         )
         assert resp.status_code == 200
         assert resp.json()["decision"] == "approved"
@@ -142,6 +146,7 @@ class TestSubmitReview:
                 "decision": "changes_requested",
                 "comment": "Rollback plan needs more detail.",
             },
+            headers=JANE,
         )
         assert resp.status_code == 200
         assert resp.json()["decision"] == "changes_requested"
@@ -163,6 +168,7 @@ class TestSubmitReview:
                 "decision": "blocked",
                 "comment": "Not during quarter-end processing.",
             },
+            headers=VP_RISK,
         )
         assert resp.status_code == 200
         assert resp.json()["decision"] == "blocked"
@@ -181,6 +187,7 @@ class TestSubmitReview:
         resp = client.post(
             f"/api/v1/changes/{change_id}/reviewers/{review_id}/decision",
             json={"decision": "approved"},
+            headers=JANE,
         )
         assert resp.status_code == 422
 
@@ -195,7 +202,7 @@ class TestApprovalGate:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "approved"},
         )
         assert resp.status_code == 422
         assert "review" in resp.json()["detail"].lower()
@@ -218,11 +225,12 @@ class TestApprovalGate:
         client.post(
             f"/api/v1/changes/{r1.json()['id']}/reviewers/{r1.json()['id']}/decision",
             json={"decision": "approved"},
+            headers=JANE,
         )
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "approved"},
         )
         assert resp.status_code == 422
 
@@ -243,15 +251,17 @@ class TestApprovalGate:
         client.post(
             f"/api/v1/changes/{change_id}/reviewers/{r1.json()['id']}/decision",
             json={"decision": "approved"},
+            headers=JANE,
         )
         client.post(
             f"/api/v1/changes/{change_id}/reviewers/{r2.json()['id']}/decision",
             json={"decision": "blocked", "comment": "No."},
+            headers=VP_RISK,
         )
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "approved"},
         )
         assert resp.status_code == 422
 
@@ -272,15 +282,17 @@ class TestApprovalGate:
         client.post(
             f"/api/v1/changes/{change_id}/reviewers/{r1.json()['id']}/decision",
             json={"decision": "approved"},
+            headers=JANE,
         )
         client.post(
             f"/api/v1/changes/{change_id}/reviewers/{r2.json()['id']}/decision",
             json={"decision": "approved"},
+            headers=BOB,
         )
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "approved"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "approved"
@@ -301,10 +313,11 @@ class TestIntegrityGuarantee:
         client.post(
             f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
             json={"decision": "approved"},
+            headers=JANE,
         )
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "approved"},
         )
         return change_id
 
@@ -315,7 +328,7 @@ class TestIntegrityGuarantee:
         # Move back to draft to edit
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "draft", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "draft"},
         )
 
         # Edit the change
@@ -335,7 +348,7 @@ class TestIntegrityGuarantee:
 
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "draft", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "draft"},
         )
 
         # Add a new checklist item
@@ -355,7 +368,7 @@ class TestIntegrityGuarantee:
         # Back to draft, edit, back to in_review
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "draft", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "draft"},
         )
         client.patch(
             f"/api/v1/changes/{change_id}",
@@ -366,7 +379,7 @@ class TestIntegrityGuarantee:
         # Try to approve — should fail, reviews are pending
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "approved"},
         )
         assert resp.status_code == 422
 
@@ -386,6 +399,7 @@ class TestReviewAuditTrail:
         client.post(
             f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
             json={"decision": "approved", "comment": "LGTM"},
+            headers=JANE,
         )
 
         from app.models.audit import AuditEvent

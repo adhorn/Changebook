@@ -70,6 +70,9 @@ def _add_checklist_items_all_phases(client, change_id):
         assert resp.status_code == 201
 
 
+REVIEWER_BOB = {"X-User-Email": "bob@changebook.dev", "X-User-Name": "Reviewer Bob"}
+
+
 def _assign_and_approve_reviewer(client, change_id):
     """Assign a reviewer and approve the change (Gate 3)."""
     # Assign a different user as reviewer (author is "Test User")
@@ -80,10 +83,11 @@ def _assign_and_approve_reviewer(client, change_id):
     assert resp.status_code == 201
     review_id = resp.json()["id"]
 
-    # Submit approval
+    # Submit approval — must use the reviewer's identity headers
     resp = client.post(
         f"/api/v1/changes/{change_id}/reviewers/{review_id}/decision",
         json={"decision": "approved", "comment": "LGTM"},
+        headers=REVIEWER_BOB,
     )
     assert resp.status_code == 200
 

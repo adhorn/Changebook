@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import UserSwitcher from "@/components/UserSwitcher";
+import { getCurrentUser } from "@/lib/auth";
 import {
   api,
   Change,
@@ -12,6 +13,8 @@ import {
   Review,
   ExecutionStatus,
   PreflightSection,
+  Customer,
+  Environment,
 } from "@/lib/api";
 
 const STATUS_COLORS: Record<ChangeStatus, string> = {
@@ -56,12 +59,14 @@ function ChecklistItemRow({
   item,
   isNext,
   isExecuting,
+  isDraft,
   changeId,
   onCompleted,
 }: {
   item: ChecklistItem;
   isNext: boolean;
   isExecuting: boolean;
+  isDraft: boolean;
   changeId: string;
   onCompleted: () => void;
 }) {
@@ -73,8 +78,55 @@ function ChecklistItemRow({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Edit mode state
+  const [editing, setEditing] = useState(false);
+  const [editDesc, setEditDesc] = useState("");
+  const [editCommand, setEditCommand] = useState("");
+  const [editExpectedOutcome, setEditExpectedOutcome] = useState("");
+  const [editRollbackAction, setEditRollbackAction] = useState("");
+  const [editIsHoldPoint, setEditIsHoldPoint] = useState(false);
+  const [saving, setSaving] = useState(false);
+
   const completion = item.completion;
   const isCompleted = !!completion;
+
+  function startEditing() {
+    setEditDesc(item.description);
+    setEditCommand(item.command || "");
+    setEditExpectedOutcome(item.expected_outcome || "");
+    setEditRollbackAction(item.rollback_action || "");
+    setEditIsHoldPoint(item.is_hold_point);
+    setEditing(true);
+  }
+
+  async function handleSaveEdit() {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.updateChecklistItem(changeId, item.id, {
+        description: editDesc.trim(),
+        command: editCommand.trim() || null,
+        expected_outcome: editExpectedOutcome.trim() || null,
+        rollback_action: editRollbackAction.trim() || null,
+        is_hold_point: editIsHoldPoint,
+      });
+      setEditing(false);
+      onCompleted();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    }
+    setSaving(false);
+  }
+
+  async function handleDelete() {
+    if (!confirm("Delete this checklist item?")) return;
+    try {
+      await api.deleteChecklistItem(changeId, item.id);
+      onCompleted();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to delete");
+    }
+  }
 
   async function handleComplete() {
     setSubmitting(true);
@@ -108,6 +160,85 @@ function ChecklistItemRow({
   const needsHoldVerification =
     isCompleted && item.is_hold_point && !completion?.hold_point_verified_by;
 
+  // --- Edit mode rendering ---
+  if (editing) {
+    return (
+      <div className="border border-blue-200 rounded-lg p-4 bg-blue-50/30 space-y-2">
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Description *</label>
+          <input
+            type="text"
+            value={editDesc}
+            onChange={(e) => setEditDesc(e.target.value)}
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+            autoFocus
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Command</label>
+          <input
+            type="text"
+            value={editCommand}
+            onChange={(e) => setEditCommand(e.target.value)}
+            placeholder="e.g. kubectl get pods -n prod"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-gray-900"
+            style={{
+              fontVariantLigatures: "none",
+              fontFeatureSettings: '"liga" 0, "clig" 0',
+              textRendering: "optimizeSpeed",
+            }}
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Expected outcome</label>
+          <input
+            type="text"
+            value={editExpectedOutcome}
+            onChange={(e) => setEditExpectedOutcome(e.target.value)}
+            placeholder="What should you see if this succeeds?"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+          />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Rollback action</label>
+          <input
+            type="text"
+            value={editRollbackAction}
+            onChange={(e) => setEditRollbackAction(e.target.value)}
+            placeholder="What to do if this step fails"
+            className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleSaveEdit}
+            disabled={saving || !editDesc.trim()}
+            className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded hover:bg-gray-800 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+          <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={editIsHoldPoint}
+              onChange={(e) => setEditIsHoldPoint(e.target.checked)}
+              className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+            />
+            Hold point
+          </label>
+          <button
+            onClick={() => setEditing(false)}
+            className="ml-auto px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+          >
+            Cancel
+          </button>
+        </div>
+        {error && <p className="text-xs text-red-600">{error}</p>}
+      </div>
+    );
+  }
+
+  // --- Read-only rendering ---
   return (
     <div
       className={`border rounded-lg p-4 ${
@@ -131,7 +262,27 @@ function ChecklistItemRow({
           {isCompleted ? "✓" : item.order}
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm text-gray-900">{item.description}</p>
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-sm text-gray-900">{item.description}</p>
+            {isDraft && (
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  onClick={startEditing}
+                  className="px-1.5 py-0.5 text-xs text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                  title="Edit item"
+                >
+                  edit
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="px-1.5 py-0.5 text-xs text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                  title="Delete item"
+                >
+                  delete
+                </button>
+              </div>
+            )}
+          </div>
           {item.command && (
             <pre
               className="mt-1 bg-gray-50 rounded p-2 text-xs font-mono text-gray-700 overflow-x-auto"
@@ -157,7 +308,7 @@ function ChecklistItemRow({
           )}
           {item.is_hold_point && (
             <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-              🔒 Hold Point
+              Hold Point
             </span>
           )}
 
@@ -175,10 +326,10 @@ function ChecklistItemRow({
                   }`}
                 >
                   {completion.status === "completed"
-                    ? "✅ Completed"
+                    ? "Completed"
                     : completion.status === "flagged"
-                      ? "⚠️ Flagged"
-                      : "⏭️ Skipped"}
+                      ? "Flagged"
+                      : "Skipped"}
                 </span>
                 <span className="text-gray-400">
                   by {completion.completed_by}
@@ -417,6 +568,18 @@ export default function ChangeDetailPage() {
   const router = useRouter();
   const id = params.id as string;
 
+  const [currentUserName, setCurrentUserName] = useState(getCurrentUser().name);
+
+  // Listen for user switches
+  useEffect(() => {
+    function handleUserChanged(e: Event) {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.name) setCurrentUserName(detail.name);
+    }
+    window.addEventListener("user-changed", handleUserChanged);
+    return () => window.removeEventListener("user-changed", handleUserChanged);
+  }, []);
+
   const [change, setChange] = useState<Change | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -439,10 +602,23 @@ export default function ChangeDetailPage() {
   const [dupTitle, setDupTitle] = useState("");
   const [duplicating, setDuplicating] = useState(false);
 
+  // Inline editing for draft details (title, description, customer/service/environment)
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editCustomerId, setEditCustomerId] = useState("");
+  const [editServiceId, setEditServiceId] = useState("");
+  const [editEnvironmentId, setEditEnvironmentId] = useState("");
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [environments, setEnvironments] = useState<Environment[]>([]);
+
   // New checklist item form — per-phase
   const [addingToPhase, setAddingToPhase] = useState<string | null>(null);
   const [newItemDesc, setNewItemDesc] = useState("");
   const [newItemCommand, setNewItemCommand] = useState("");
+  const [newItemExpectedOutcome, setNewItemExpectedOutcome] = useState("");
+  const [newItemRollbackAction, setNewItemRollbackAction] = useState("");
   const [newItemHoldPoint, setNewItemHoldPoint] = useState(false);
 
   const loadAll = useCallback(async () => {
@@ -495,9 +671,14 @@ export default function ChangeDetailPage() {
     setTransitioning(false);
   }
 
-  async function handleAddReviewer() {
+  const [reviewerName, setReviewerName] = useState("");
+  const [addingReviewer, setAddingReviewer] = useState(false);
+
+  async function handleAddReviewer(name?: string) {
     try {
-      await api.assignReviewer(id);
+      await api.assignReviewer(id, name?.trim() || undefined);
+      setReviewerName("");
+      setAddingReviewer(false);
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add reviewer");
@@ -520,16 +701,52 @@ export default function ChangeDetailPage() {
         phase,
         description: newItemDesc.trim(),
         command: newItemCommand.trim() || undefined,
+        expected_outcome: newItemExpectedOutcome.trim() || undefined,
+        rollback_action: newItemRollbackAction.trim() || undefined,
         is_hold_point: newItemHoldPoint || undefined,
       });
       setNewItemDesc("");
       setNewItemCommand("");
+      setNewItemExpectedOutcome("");
+      setNewItemRollbackAction("");
       setNewItemHoldPoint(false);
       // Keep the form open in the same phase so you can add multiple items
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed");
     }
+  }
+
+  function startEditingDetails() {
+    if (!change) return;
+    setEditTitle(change.title);
+    setEditDescription(change.description || "");
+    setEditCustomerId(change.customer_id);
+    setEditServiceId(change.service_id);
+    setEditEnvironmentId(change.environment_id);
+    setEditingDetails(true);
+    // Load customers/environments for dropdowns
+    api.listCustomers().then(setCustomers).catch(console.error);
+    api.listEnvironments().then(setEnvironments).catch(console.error);
+  }
+
+  async function handleSaveDetails() {
+    setSavingDetails(true);
+    setError(null);
+    try {
+      await api.updateChange(id, {
+        title: editTitle,
+        description: editDescription || undefined,
+        customer_id: editCustomerId,
+        service_id: editServiceId,
+        environment_id: editEnvironmentId,
+      });
+      setEditingDetails(false);
+      await loadAll();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save changes");
+    }
+    setSavingDetails(false);
   }
 
   function startEditingPreflight() {
@@ -552,7 +769,7 @@ export default function ChangeDetailPage() {
       setPreflightEditing(false);
       await loadAll();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to save pre-flight answers");
+      setError(err instanceof Error ? err.message : "Failed to save change profile");
     }
     setSavingPreflight(false);
   }
@@ -610,6 +827,8 @@ export default function ChangeDetailPage() {
   const isExecuting = change.status === "executing";
   const isDraft = change.status === "draft";
   const isTerminal = change.status === "done" || change.status === "aborted";
+  const isAuthor = currentUserName === change.author_name;
+  const canEdit = isDraft && isAuthor;
 
   // Group checklist by phase
   const checklistByPhase: Record<string, ChecklistItem[]> = {};
@@ -716,6 +935,14 @@ export default function ChangeDetailPage() {
             </div>
             <div className="flex items-center gap-3">
               <UserSwitcher />
+              {canEdit && !editingDetails && (
+                <button
+                  onClick={startEditingDetails}
+                  className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Edit
+                </button>
+              )}
               <button
                 onClick={handleExport}
                 className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -731,7 +958,7 @@ export default function ChangeDetailPage() {
               >
                 Duplicate
               </button>
-              {!isTerminal && (
+              {!isTerminal && isAuthor && (
                 <button
                   onClick={() => setShowAbort(!showAbort)}
                   className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50"
@@ -739,7 +966,7 @@ export default function ChangeDetailPage() {
                   {showAbort ? "Cancel" : "Abort"}
                 </button>
               )}
-              {transitions.map((t) => (
+              {isAuthor && transitions.map((t) => (
                 <button
                   key={t.target}
                   onClick={() => handleTransition(t.target)}
@@ -809,7 +1036,7 @@ export default function ChangeDetailPage() {
               Duplicate this change
             </h2>
             <p className="text-xs text-gray-500">
-              Creates a copy with the same pre-flight answers, checklist, and
+              Creates a copy with the same change profile, checklist, and
               defence tags. Status resets to Draft.
             </p>
             <div className="grid grid-cols-2 gap-3">
@@ -844,7 +1071,90 @@ export default function ChangeDetailPage() {
           </div>
         )}
 
-        {change.description && (
+        {/* Inline editing for draft details */}
+        {editingDetails && (
+          <div className="bg-white rounded-lg border border-blue-200 p-6 space-y-4">
+            <h2 className="text-sm font-medium text-gray-900">Edit Change Details</h2>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Customer</label>
+                <select
+                  value={editCustomerId}
+                  onChange={(e) => { setEditCustomerId(e.target.value); setEditServiceId(""); }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                >
+                  <option value="">Select customer...</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Service</label>
+                <select
+                  value={editServiceId}
+                  onChange={(e) => setEditServiceId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                >
+                  <option value="">Select service...</option>
+                  {(customers.find((c) => c.id === editCustomerId)?.services || []).map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Environment</label>
+                <select
+                  value={editEnvironmentId}
+                  onChange={(e) => setEditEnvironmentId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                >
+                  <option value="">Select environment...</option>
+                  {environments.map((env) => (
+                    <option key={env.id} value={env.id}>
+                      {env.name} {env.platform ? `(${env.platform})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveDetails}
+                disabled={savingDetails || !editTitle.trim()}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+              >
+                {savingDetails ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={() => setEditingDetails(false)}
+                className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!editingDetails && change.description && (
           <div className="bg-white rounded-lg border border-gray-200 p-6">
             <p className="text-sm text-gray-700">{change.description}</p>
           </div>
@@ -903,7 +1213,7 @@ export default function ChangeDetailPage() {
               >
                 <div>
                   <h2 className="text-lg font-medium text-gray-900">
-                    Pre-flight Answers
+                    Change Profile
                   </h2>
                   <p className="text-sm text-gray-500 mt-0.5">
                     {answeredCount} questions answered
@@ -913,7 +1223,7 @@ export default function ChangeDetailPage() {
                   {preflightExpanded ? "▾" : "▸"}
                 </span>
               </button>
-              {isDraft && !preflightEditing && (
+              {canEdit && !preflightEditing && (
                 <button
                   onClick={startEditingPreflight}
                   className="ml-4 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -1081,6 +1391,7 @@ export default function ChangeDetailPage() {
                         item={item}
                         isNext={execStatus?.next_item_id === item.id}
                         isExecuting={isExecuting}
+                        isDraft={canEdit}
                         changeId={id}
                         onCompleted={loadAll}
                       />
@@ -1089,7 +1400,7 @@ export default function ChangeDetailPage() {
                 )}
 
                 {/* Per-phase add form — appears below the last item */}
-                {isDraft && isAddingHere && (
+                {canEdit && isAddingHere && (
                   <div
                     className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2"
                     ref={(el) => {
@@ -1108,6 +1419,8 @@ export default function ChangeDetailPage() {
                           setAddingToPhase(null);
                           setNewItemDesc("");
                           setNewItemCommand("");
+                          setNewItemExpectedOutcome("");
+                          setNewItemRollbackAction("");
                           setNewItemHoldPoint(false);
                         }
                       }}
@@ -1124,15 +1437,20 @@ export default function ChangeDetailPage() {
                         fontFeatureSettings: '"liga" 0, "clig" 0',
                         textRendering: "optimizeSpeed",
                       }}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleAddChecklistItem(phase);
-                        if (e.key === "Escape") {
-                          setAddingToPhase(null);
-                          setNewItemDesc("");
-                          setNewItemCommand("");
-                          setNewItemHoldPoint(false);
-                        }
-                      }}
+                    />
+                    <input
+                      type="text"
+                      value={newItemExpectedOutcome}
+                      onChange={(e) => setNewItemExpectedOutcome(e.target.value)}
+                      placeholder="Expected outcome (optional) — what should you see?"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
+                    />
+                    <input
+                      type="text"
+                      value={newItemRollbackAction}
+                      onChange={(e) => setNewItemRollbackAction(e.target.value)}
+                      placeholder="Rollback action (optional) — what if this step fails?"
+                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
                     />
                     <div className="flex items-center gap-3">
                       <button
@@ -1156,6 +1474,8 @@ export default function ChangeDetailPage() {
                           setAddingToPhase(null);
                           setNewItemDesc("");
                           setNewItemCommand("");
+                          setNewItemExpectedOutcome("");
+                          setNewItemRollbackAction("");
                           setNewItemHoldPoint(false);
                         }}
                         className="ml-auto px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
@@ -1167,12 +1487,14 @@ export default function ChangeDetailPage() {
                 )}
 
                 {/* Add button at the bottom of each phase */}
-                {isDraft && !isAddingHere && (
+                {canEdit && !isAddingHere && (
                   <button
                     onClick={() => {
                       setAddingToPhase(phase);
                       setNewItemDesc("");
                       setNewItemCommand("");
+                      setNewItemExpectedOutcome("");
+                      setNewItemRollbackAction("");
                       setNewItemHoldPoint(false);
                     }}
                     className="mt-2 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
@@ -1201,7 +1523,8 @@ export default function ChangeDetailPage() {
                   review={review}
                   canDecide={
                     review.decision === "pending" &&
-                    change.status === "in_review"
+                    change.status === "in_review" &&
+                    currentUserName === review.reviewer_name
                   }
                   onDecision={(decision, comment) =>
                     handleReviewDecision(review.id, decision, comment)
@@ -1211,14 +1534,46 @@ export default function ChangeDetailPage() {
             </div>
           )}
 
-          {/* Assign yourself as reviewer */}
-          {!isTerminal && (
-            <button
-              onClick={handleAddReviewer}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Assign myself as reviewer
-            </button>
+          {/* Assign reviewer — only the author can assign */}
+          {!isTerminal && isAuthor && (
+            <>
+              {!addingReviewer ? (
+                <button
+                  onClick={() => setAddingReviewer(true)}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  + Assign reviewer
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={reviewerName}
+                    onChange={(e) => setReviewerName(e.target.value)}
+                    placeholder="Reviewer name..."
+                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && reviewerName.trim()) handleAddReviewer(reviewerName);
+                      if (e.key === "Escape") { setAddingReviewer(false); setReviewerName(""); }
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => handleAddReviewer(reviewerName)}
+                    disabled={!reviewerName.trim()}
+                    className="px-3 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    Assign
+                  </button>
+                  <button
+                    onClick={() => { setAddingReviewer(false); setReviewerName(""); }}
+                    className="px-2 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>

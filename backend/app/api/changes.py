@@ -37,6 +37,15 @@ from app.services import reviews as review_service
 router = APIRouter(prefix="/changes", tags=["changes"])
 
 
+def _require_author(user: CurrentUser, change) -> None:
+    """Raise 403 if the current user is not the change author."""
+    if user.name != change.author_name:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Only the change author ({change.author_name}) can perform this action.",
+        )
+
+
 @router.post("", response_model=ChangeDetailResponse, status_code=201)
 def create_change(
     payload: ChangeCreate,
@@ -127,8 +136,8 @@ def duplicate_change(
     if not source:
         raise HTTPException(status_code=404, detail="Change not found")
 
-    overrides = payload.model_dump(exclude={"author_name"}, exclude_unset=True)
-    clone = change_service.duplicate_change(db, source, overrides, payload.author_name or user.name)
+    overrides = payload.model_dump(exclude_unset=True)
+    clone = change_service.duplicate_change(db, source, overrides, user.name)
     return clone
 
 
@@ -155,6 +164,7 @@ def update_change(
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
     if change.status != ChangeStatus.DRAFT:
         raise HTTPException(status_code=422, detail="Can only update changes in draft status")
 
@@ -167,7 +177,6 @@ def update_change(
 def transition_change(
     change_id: uuid.UUID,
     target_status: ChangeStatus,
-    actor_name: str | None = None,
     reason: str | None = None,
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -175,12 +184,13 @@ def transition_change(
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
     try:
         change = change_service.transition_status(
             db,
             change,
             target_status,
-            actor_name or user.name,
+            user.name,
             reason=reason,
         )
     except ValueError as e:
@@ -205,6 +215,7 @@ def add_checklist_item(
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
     if change.status != ChangeStatus.DRAFT:
         raise HTTPException(
             status_code=422,
@@ -240,11 +251,13 @@ def list_checklist_items(
 def reorder_checklist_items(
     change_id: uuid.UUID,
     payload: ChecklistReorder,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
     if change.status != ChangeStatus.DRAFT:
         raise HTTPException(
             status_code=422,
@@ -287,11 +300,13 @@ def update_checklist_item(
     change_id: uuid.UUID,
     item_id: uuid.UUID,
     payload: ChecklistItemUpdate,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
     if change.status != ChangeStatus.DRAFT:
         raise HTTPException(
             status_code=422,
@@ -314,11 +329,13 @@ def update_checklist_item(
 def delete_checklist_item(
     change_id: uuid.UUID,
     item_id: uuid.UUID,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
     if change.status != ChangeStatus.DRAFT:
         raise HTTPException(
             status_code=422,
@@ -355,10 +372,9 @@ def complete_checklist_item(
     if not item:
         raise HTTPException(status_code=404, detail="Checklist item not found")
 
-    completed_by = payload.completed_by or user.name
     try:
         completion = execution_service.complete_item(
-            db, change, item, payload.observed_result, payload.status, completed_by
+            db, change, item, payload.observed_result, payload.status, user.name
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -384,10 +400,16 @@ def verify_hold_point(
     if not item:
         raise HTTPException(status_code=404, detail="Checklist item not found")
 
-    try:
-        completion = execution_service.verify_hold_point(
-            db, change, item, payload.verified_by or user.name
+    # Two-person rule: verifier must be different from completer
+    if item.completion and item.completion.completed_by == user.name:
+        raise HTTPException(
+            status_code=422,
+            detail="Hold point must be verified by a different person "
+            "than the one who completed the item.",
         )
+
+    try:
+        completion = execution_service.verify_hold_point(db, change, item, user.name)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return completion
@@ -428,6 +450,7 @@ def assign_reviewer(
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
 
     reviewer_name = payload.reviewer_name or user.name
 
@@ -483,6 +506,13 @@ def submit_review_decision(
     review = review_service.get_review(db, change_id, review_id)
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
+
+    # Only the assigned reviewer can submit their own decision
+    if user.name != review.reviewer_name:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Only the assigned reviewer ({review.reviewer_name}) can submit this decision.",
+        )
 
     review = review_service.submit_decision(db, review, payload.decision, payload.comment)
     return review

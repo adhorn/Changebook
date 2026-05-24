@@ -48,9 +48,9 @@ def render_markdown(db: Session, change: Change) -> str:
         sections.append(f"- **Cloned from:** {change.cloned_from}")
     sections.append("")
 
-    # Pre-flight answers
+    # Change profile (pre-flight answers)
     if change.preflight_answers:
-        sections.append("## Pre-flight Answers")
+        sections.append("## Change Profile")
         sections.append("")
         if change.preflight_schema_version:
             sections.append(f"*Schema version: {change.preflight_schema_version}*")

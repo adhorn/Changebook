@@ -217,6 +217,18 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  updateChecklistItem: (changeId: string, itemId: string, data: {
+    description?: string;
+    command?: string | null;
+    expected_outcome?: string | null;
+    rollback_action?: string | null;
+    is_hold_point?: boolean;
+  }) =>
+    request<ChecklistItem>(`/changes/${changeId}/checklist/${itemId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
   deleteChecklistItem: (changeId: string, itemId: string) =>
     fetch(`${API_BASE}/api/v1/changes/${changeId}/checklist/${itemId}`, {
       method: "DELETE",
@@ -246,10 +258,10 @@ export const api = {
   listReviews: (changeId: string) =>
     request<Review[]>(`/changes/${changeId}/reviewers`),
 
-  assignReviewer: (changeId: string) =>
+  assignReviewer: (changeId: string, reviewerName?: string) =>
     request<Review>(`/changes/${changeId}/reviewers`, {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify(reviewerName ? { reviewer_name: reviewerName } : {}),
     }),
 
   submitDecision: (changeId: string, reviewId: string, decision: string, comment?: string) =>
