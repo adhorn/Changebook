@@ -138,7 +138,12 @@ function ChecklistItemRow({
           {item.command && (
             <pre
               className="mt-1 bg-gray-50 rounded p-2 text-xs font-mono text-gray-700 overflow-x-auto"
-              style={{ whiteSpace: "pre", hyphens: "none", wordBreak: "keep-all" }}
+              style={{
+                whiteSpace: "pre-wrap",
+                fontVariantLigatures: "none",
+                fontFeatureSettings: '"liga" 0, "clig" 0',
+                textRendering: "optimizeSpeed",
+              }}
             >
               {item.command}
             </pre>
@@ -187,7 +192,11 @@ function ChecklistItemRow({
               </div>
               <pre
                 className="mt-1 bg-gray-50 rounded p-2 font-mono text-gray-700 whitespace-pre-wrap overflow-x-auto"
-                style={{ hyphens: "none", wordBreak: "keep-all" }}
+                style={{
+                  fontVariantLigatures: "none",
+                  fontFeatureSettings: '"liga" 0, "clig" 0',
+                  textRendering: "optimizeSpeed",
+                }}
               >
                 {completion.observed_result}
               </pre>
@@ -1153,6 +1162,11 @@ export default function ChangeDetailPage() {
                       onChange={(e) => setNewItemCommand(e.target.value)}
                       placeholder="Command (optional) — e.g. kubectl get pods -n prod"
                       className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-gray-900"
+                      style={{
+                        fontVariantLigatures: "none",
+                        fontFeatureSettings: '"liga" 0, "clig" 0',
+                        textRendering: "optimizeSpeed",
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") handleAddChecklistItem(phase);
                         if (e.key === "Escape") {
