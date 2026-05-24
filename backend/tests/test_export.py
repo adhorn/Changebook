@@ -110,12 +110,13 @@ class TestMarkdownExport:
         assert "database" in md
         assert "monitoring" in md
 
-    def test_export_contains_preflight_answers(self, client, sample_change_data):
-        """Pre-flight answers appear in the export."""
+    def test_export_contains_change_profile(self, client, sample_change_data):
+        """Change profile (formerly pre-flight answers) appears in the export."""
         change_id, _ = _create_full_change(client, sample_change_data)
 
         md = client.get(f"/api/v1/changes/{change_id}/export/markdown").text
-        assert "Pre-flight" in md
+        assert "## Change Profile" in md
+        assert "Pre-flight Answers" not in md
         # Should contain at least one answer
         assert "Answer for" in md
 
