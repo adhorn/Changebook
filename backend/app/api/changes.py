@@ -409,9 +409,7 @@ def verify_hold_point(
         )
 
     try:
-        completion = execution_service.verify_hold_point(
-            db, change, item, user.name
-        )
+        completion = execution_service.verify_hold_point(db, change, item, user.name)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return completion
