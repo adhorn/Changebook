@@ -351,9 +351,10 @@ def complete_checklist_item(
     if not item:
         raise HTTPException(status_code=404, detail="Checklist item not found")
 
+    completed_by = payload.completed_by or user.name
     try:
         completion = execution_service.complete_item(
-            db, change, item, payload.observed_result, payload.status, payload.completed_by or user.name
+            db, change, item, payload.observed_result, payload.status, completed_by
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
