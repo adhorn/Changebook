@@ -8,6 +8,7 @@ The execution model enforces:
 - Each completion records who, when, what was observed
 """
 
+
 def _complete_preflight(client):
     """Build a complete set of pre-flight answers from the API."""
     resp = client.get("/api/v1/preflight-questions")
@@ -111,9 +112,7 @@ class TestSequentialUnlock:
             "execution": [{"description": "Run script"}],
             "verification": [{"description": "Verify output"}],
         }
-        change_id, items = _create_executing_change(
-            client, sample_change_data, items=items_def
-        )
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
         second_item = items["pre_flight"][1]
 
         resp = client.post(
@@ -137,9 +136,7 @@ class TestSequentialUnlock:
             "execution": [{"description": "Run script"}],
             "verification": [{"description": "Verify output"}],
         }
-        change_id, items = _create_executing_change(
-            client, sample_change_data, items=items_def
-        )
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
 
         # Complete first
         client.post(
@@ -191,9 +188,7 @@ class TestSequentialUnlock:
 class TestPhaseGating:
     """Must complete all items in one phase before the next phase unlocks."""
 
-    def test_cannot_start_execution_before_preflight_done(
-        self, client, sample_change_data
-    ):
+    def test_cannot_start_execution_before_preflight_done(self, client, sample_change_data):
         """Execution items are blocked until all pre-flight items are complete."""
         change_id, items = _create_executing_change(client, sample_change_data)
         exec_item = items["execution"][0]
@@ -209,9 +204,7 @@ class TestPhaseGating:
         assert resp.status_code == 422
         assert "phase" in resp.json()["detail"].lower()
 
-    def test_execution_unlocks_after_preflight_complete(
-        self, client, sample_change_data
-    ):
+    def test_execution_unlocks_after_preflight_complete(self, client, sample_change_data):
         """After all pre-flight items are done, execution items unlock."""
         change_id, items = _create_executing_change(client, sample_change_data)
 
@@ -236,9 +229,7 @@ class TestPhaseGating:
         )
         assert resp.status_code == 200
 
-    def test_cannot_start_verification_before_execution_done(
-        self, client, sample_change_data
-    ):
+    def test_cannot_start_verification_before_execution_done(self, client, sample_change_data):
         """Verification items are blocked until all execution items are complete."""
         change_id, items = _create_executing_change(client, sample_change_data)
 
@@ -278,9 +269,7 @@ class TestHoldPoints:
             ],
             "verification": [{"description": "Check health"}],
         }
-        change_id, items = _create_executing_change(
-            client, sample_change_data, items=items_def
-        )
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
 
         # Complete pre-flight
         client.post(
@@ -324,9 +313,7 @@ class TestHoldPoints:
             ],
             "verification": [{"description": "Check health"}],
         }
-        change_id, items = _create_executing_change(
-            client, sample_change_data, items=items_def
-        )
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
 
         # Complete pre-flight
         client.post(
@@ -367,9 +354,7 @@ class TestHoldPoints:
             ],
             "verification": [{"description": "Check health"}],
         }
-        change_id, items = _create_executing_change(
-            client, sample_change_data, items=items_def
-        )
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
 
         # Complete pre-flight
         client.post(
@@ -438,9 +423,7 @@ class TestHoldPoints:
             ],
             "verification": [{"description": "Check health"}],
         }
-        change_id, items = _create_executing_change(
-            client, sample_change_data, items=items_def
-        )
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
@@ -653,9 +636,7 @@ class TestExecutionAudit:
         assert len(events) == 1
         assert events[0].actor_name == "Adrian Hornsby"
 
-    def test_hold_point_verification_creates_audit(
-        self, client, sample_change_data, db
-    ):
+    def test_hold_point_verification_creates_audit(self, client, sample_change_data, db):
         """Hold-point verification is recorded in the audit trail."""
         items_def = {
             "pre_flight": [
@@ -664,9 +645,7 @@ class TestExecutionAudit:
             "execution": [{"description": "Run"}],
             "verification": [{"description": "Verify"}],
         }
-        change_id, items = _create_executing_change(
-            client, sample_change_data, items=items_def
-        )
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
 
         # Complete the hold-point item
         client.post(

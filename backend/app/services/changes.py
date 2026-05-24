@@ -93,10 +93,7 @@ def list_changes(
     # For SQLite compatibility, we filter in Python for now
     if defence_tag:
         all_changes = query.all()
-        filtered = [
-            c for c in all_changes
-            if c.defence_tags and defence_tag in c.defence_tags
-        ]
+        filtered = [c for c in all_changes if c.defence_tags and defence_tag in c.defence_tags]
         total = len(filtered)
         changes = filtered[offset : offset + limit]
         return changes, total
@@ -141,9 +138,7 @@ def update_change(db: Session, change: Change, data: dict, actor_name: str) -> C
     return change
 
 
-def duplicate_change(
-    db: Session, source: Change, overrides: dict, author_name: str
-) -> Change:
+def duplicate_change(db: Session, source: Change, overrides: dict, author_name: str) -> Change:
     """Clone a change — same structure, fresh state.
 
     Copies: title, description, preflight answers, defence tags, checklist items.
@@ -202,7 +197,10 @@ def duplicate_change(
 
 
 def transition_status(
-    db: Session, change: Change, new_status: ChangeStatus, actor_name: str,
+    db: Session,
+    change: Change,
+    new_status: ChangeStatus,
+    actor_name: str,
     reason: str | None = None,
 ) -> Change:
     old_status = change.status
@@ -240,22 +238,16 @@ def transition_status(
 
     # Gate on transition to approved: all reviewers must have approved
     if new_status == ChangeStatus.APPROVED:
-        reviews = (
-            db.query(Review).filter(Review.change_id == change.id).all()
-        )
+        reviews = db.query(Review).filter(Review.change_id == change.id).all()
         if not reviews:
             raise ValueError(
-                "Cannot approve — no reviewers assigned. "
-                "At least one reviewer must approve."
+                "Cannot approve — no reviewers assigned. At least one reviewer must approve."
             )
-        non_approved = [
-            r for r in reviews if r.decision != ReviewDecision.APPROVED
-        ]
+        non_approved = [r for r in reviews if r.decision != ReviewDecision.APPROVED]
         if non_approved:
             pending_names = [r.reviewer_name for r in non_approved]
             raise ValueError(
-                f"Cannot approve — not all reviewers have approved. "
-                f"Outstanding: {pending_names}"
+                f"Cannot approve — not all reviewers have approved. Outstanding: {pending_names}"
             )
 
     # Staleness warning on transition to executing
@@ -307,9 +299,7 @@ def transition_status(
 # --- Checklist operations ---
 
 
-def add_checklist_item(
-    db: Session, change_id: uuid.UUID, data: dict
-) -> ChecklistItem:
+def add_checklist_item(db: Session, change_id: uuid.UUID, data: dict) -> ChecklistItem:
     phase = data["phase"]
 
     # Auto-order: next in sequence for this phase
@@ -372,9 +362,7 @@ def list_checklist_items(
     return items
 
 
-def update_checklist_item(
-    db: Session, item: ChecklistItem, data: dict
-) -> ChecklistItem:
+def update_checklist_item(db: Session, item: ChecklistItem, data: dict) -> ChecklistItem:
     for key, value in data.items():
         if value is not None:
             setattr(item, key, value)

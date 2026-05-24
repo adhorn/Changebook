@@ -158,9 +158,7 @@ class TestFullLifecycleWithGates:
                 f"/api/v1/changes/{change_id}/transition",
                 params={"target_status": status, "actor_name": "Adrian Hornsby"},
             )
-            assert resp.status_code == 200, (
-                f"Failed transition to {status}: {resp.json()}"
-            )
+            assert resp.status_code == 200, f"Failed transition to {status}: {resp.json()}"
             assert resp.json()["status"] == status
 
     def test_abort_bypasses_all_gates(self, client, sample_change_data):

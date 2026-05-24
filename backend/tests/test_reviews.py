@@ -329,9 +329,7 @@ class TestIntegrityGuarantee:
         assert len(reviews) == 1
         assert all(r["decision"] == "pending" for r in reviews)
 
-    def test_edit_checklist_after_approval_resets_reviews(
-        self, client, sample_change_data
-    ):
+    def test_edit_checklist_after_approval_resets_reviews(self, client, sample_change_data):
         """Editing checklist items after approval also resets reviews."""
         change_id = self._get_change_approved(client, sample_change_data)
 

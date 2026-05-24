@@ -34,9 +34,7 @@ class ChecklistItem(UUIDMixin, TimestampMixin, Base):
     change_id: Mapped[uuid.UUID] = mapped_column(
         PortableUUID, ForeignKey("changes.id"), nullable=False
     )
-    phase: Mapped[ChecklistPhase] = mapped_column(
-        Enum(ChecklistPhase), nullable=False
-    )
+    phase: Mapped[ChecklistPhase] = mapped_column(Enum(ChecklistPhase), nullable=False)
     order: Mapped[int] = mapped_column(Integer, nullable=False)
 
     # What to do
@@ -70,20 +68,14 @@ class ChecklistCompletion(UUIDMixin, TimestampMixin, Base):
 
     # The read-back — what the operator observed
     observed_result: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[CompletionStatus] = mapped_column(
-        Enum(CompletionStatus), nullable=False
-    )
+    status: Mapped[CompletionStatus] = mapped_column(Enum(CompletionStatus), nullable=False)
 
     # Who completed it
     completed_by: Mapped[str] = mapped_column(String(255), nullable=False)
-    completed_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
-    )
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     # Hold point verification (by a second person)
-    hold_point_verified_by: Mapped[str | None] = mapped_column(
-        String(255), nullable=True
-    )
+    hold_point_verified_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
     hold_point_verified_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

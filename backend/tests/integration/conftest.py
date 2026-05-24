@@ -72,25 +72,36 @@ def client(db):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app, headers={
-        "X-User-Email": "test@changebook.dev",
-        "X-User-Name": "Test User",
-    }) as c:
+    with TestClient(
+        app,
+        headers={
+            "X-User-Email": "test@changebook.dev",
+            "X-User-Name": "Test User",
+        },
+    ) as c:
         yield c
     app.dependency_overrides.clear()
 
 
 @pytest.fixture
-def org_and_team(client):
-    """Create a default team. Organisation is auto-injected."""
-    team = client.post("/api/v1/teams", json={"name": "Platform Team"})
-    team_data = team.json()
-
-    return {"org_id": team_data["organisation_id"], "team_id": team_data["id"]}
+def customer_and_service(client):
+    """Create a customer with one service. Organisation is auto-injected."""
+    resp = client.post(
+        "/api/v1/customers",
+        json={
+            "name": "SimCorp A/S",
+            "services": [{"name": "Data Platform"}],
+        },
+    )
+    cust_data = resp.json()
+    return {
+        "customer_id": cust_data["id"],
+        "service_id": cust_data["services"][0]["id"],
+    }
 
 
 @pytest.fixture
-def environment(client, org_and_team):
+def environment(client):
     """Create a test environment."""
     resp = client.post(
         "/api/v1/environments",

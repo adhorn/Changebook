@@ -69,11 +69,7 @@ def render_markdown(db: Session, change: Change) -> str:
             sections.append("")
 
     # Checklist
-    items = (
-        db.query(ChecklistItem)
-        .filter(ChecklistItem.change_id == change.id)
-        .all()
-    )
+    items = db.query(ChecklistItem).filter(ChecklistItem.change_id == change.id).all()
     if items:
         sections.append("## Checklist")
         sections.append("")
@@ -103,49 +99,31 @@ def render_markdown(db: Session, change: Change) -> str:
                         "skipped_with_justification": "⏭️",
                     }.get(completion.status.value, "❓")
 
+                    sections.append(f"{item.order}. {status_icon} {item.description}{hold}")
+                    sections.append(f"   - **Observed:** {completion.observed_result}")
                     sections.append(
-                        f"{item.order}. {status_icon} {item.description}{hold}"
+                        f"   - **By:** {completion.completed_by} at {completion.completed_at}"
                     )
-                    sections.append(
-                        f"   - **Observed:** {completion.observed_result}"
-                    )
-                    sections.append(
-                        f"   - **By:** {completion.completed_by} "
-                        f"at {completion.completed_at}"
-                    )
-                    if (
-                        item.is_hold_point
-                        and completion.hold_point_verified_by
-                    ):
+                    if item.is_hold_point and completion.hold_point_verified_by:
                         sections.append(
                             f"   - **Hold point verified by:** "
                             f"{completion.hold_point_verified_by} "
                             f"at {completion.hold_point_verified_at}"
                         )
                 else:
-                    sections.append(
-                        f"{item.order}. ⬜ {item.description}{hold}"
-                    )
+                    sections.append(f"{item.order}. ⬜ {item.description}{hold}")
 
                 if item.command:
                     sections.append(f"   - **Command:** `{item.command}`")
                 if item.expected_outcome:
-                    sections.append(
-                        f"   - **Expected:** {item.expected_outcome}"
-                    )
+                    sections.append(f"   - **Expected:** {item.expected_outcome}")
                 if item.rollback_action:
-                    sections.append(
-                        f"   - **Rollback:** {item.rollback_action}"
-                    )
+                    sections.append(f"   - **Rollback:** {item.rollback_action}")
 
             sections.append("")
 
     # Reviews
-    reviews = (
-        db.query(Review)
-        .filter(Review.change_id == change.id)
-        .all()
-    )
+    reviews = db.query(Review).filter(Review.change_id == change.id).all()
     if reviews:
         sections.append("## Reviews")
         sections.append("")
@@ -158,8 +136,7 @@ def render_markdown(db: Session, change: Change) -> str:
             }.get(review.decision.value, "❓")
 
             sections.append(
-                f"- **{review.reviewer_name}:** "
-                f"{decision_icon} {review.decision.value}"
+                f"- **{review.reviewer_name}:** {decision_icon} {review.decision.value}"
             )
             if review.comment:
                 sections.append(f"  > {review.comment}")
@@ -180,10 +157,7 @@ def render_markdown(db: Session, change: Change) -> str:
         for event in events:
             desc = event.description or ""
             sections.append(
-                f"| {event.created_at} "
-                f"| {event.event_type} "
-                f"| {event.actor_name} "
-                f"| {desc} |"
+                f"| {event.created_at} | {event.event_type} | {event.actor_name} | {desc} |"
             )
         sections.append("")
 

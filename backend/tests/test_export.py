@@ -130,9 +130,7 @@ class TestMarkdownExport:
 
     def test_export_not_found(self, client):
         """Exporting a non-existent change returns 404."""
-        resp = client.get(
-            "/api/v1/changes/00000000-0000-0000-0000-000000000000/export/markdown"
-        )
+        resp = client.get("/api/v1/changes/00000000-0000-0000-0000-000000000000/export/markdown")
         assert resp.status_code == 404
 
 

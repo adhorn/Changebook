@@ -177,7 +177,11 @@ def transition_change(
         raise HTTPException(status_code=404, detail="Change not found")
     try:
         change = change_service.transition_status(
-            db, change, target_status, actor_name or user.name, reason=reason,
+            db,
+            change,
+            target_status,
+            actor_name or user.name,
+            reason=reason,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -480,7 +484,5 @@ def submit_review_decision(
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
 
-    review = review_service.submit_decision(
-        db, review, payload.decision, payload.comment
-    )
+    review = review_service.submit_decision(db, review, payload.decision, payload.comment)
     return review

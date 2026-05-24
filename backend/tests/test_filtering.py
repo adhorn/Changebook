@@ -7,6 +7,7 @@ Adds to the existing list endpoint:
 - Audit event count in list responses
 """
 
+
 def _create_changes(client, sample_change_data, titles):
     """Create multiple changes with given titles."""
     ids = []
@@ -164,9 +165,7 @@ class TestSorting:
 
     def test_sort_recently_updated(self, client, sample_change_data):
         """Sort by most recently updated."""
-        ids = _create_changes(
-            client, sample_change_data, ["Alpha", "Beta", "Gamma"]
-        )
+        ids = _create_changes(client, sample_change_data, ["Alpha", "Beta", "Gamma"])
 
         # Update Alpha so it becomes the most recently updated
         client.patch(
@@ -217,7 +216,5 @@ class TestAuditEventCount:
         )
 
         resp = client.get("/api/v1/changes")
-        change_data = next(
-            c for c in resp.json()["data"] if c["id"] == change_id
-        )
+        change_data = next(c for c in resp.json()["data"] if c["id"] == change_id)
         assert change_data["audit_event_count"] >= 2

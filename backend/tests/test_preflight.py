@@ -54,14 +54,10 @@ class TestPreflightQuestionEndpoint:
         required_fields = {"key", "label", "type", "required", "description", "example"}
 
         for section in sections:
-            assert len(section["questions"]) > 0, (
-                f"Section '{section['key']}' has no questions"
-            )
+            assert len(section["questions"]) > 0, f"Section '{section['key']}' has no questions"
             for q in section["questions"]:
                 missing = required_fields - set(q.keys())
-                assert not missing, (
-                    f"Question '{q.get('key', '?')}' missing fields: {missing}"
-                )
+                assert not missing, f"Question '{q.get('key', '?')}' missing fields: {missing}"
 
     def test_question_keys_are_unique(self, client):
         """Every question key is globally unique across all sections."""
@@ -74,8 +70,7 @@ class TestPreflightQuestionEndpoint:
                 all_keys.append(q["key"])
 
         assert len(all_keys) == len(set(all_keys)), (
-            f"Duplicate question keys found: "
-            f"{[k for k in all_keys if all_keys.count(k) > 1]}"
+            f"Duplicate question keys found: {[k for k in all_keys if all_keys.count(k) > 1]}"
         )
 
     def test_one_question_one_thought(self, client):
@@ -266,9 +261,7 @@ class TestPreflightValidationOnTransition:
     def test_can_submit_with_complete_answers(self, client, sample_change_data):
         """A change with all required answers filled in can move to in_review."""
         answers = self._make_complete_answers(client)
-        change_id = self._create_change(
-            client, sample_change_data, preflight_answers=answers
-        )
+        change_id = self._create_change(client, sample_change_data, preflight_answers=answers)
         self._add_items_to_all_phases(client, change_id)
 
         resp = client.post(

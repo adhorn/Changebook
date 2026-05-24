@@ -36,11 +36,7 @@ def _get_ordered_items(db: Session, change_id: uuid.UUID) -> list[ChecklistItem]
         ChecklistPhase.EXECUTION: 1,
         ChecklistPhase.VERIFICATION: 2,
     }
-    items = (
-        db.query(ChecklistItem)
-        .filter(ChecklistItem.change_id == change_id)
-        .all()
-    )
+    items = db.query(ChecklistItem).filter(ChecklistItem.change_id == change_id).all()
     items.sort(key=lambda i: (phase_order.get(i.phase, 99), i.order))
     return items
 
@@ -96,9 +92,7 @@ def complete_item(
 
     # Gate: item not already completed
     if _is_item_completed(item):
-        raise ValueError(
-            f"Item '{item.description}' has already been completed."
-        )
+        raise ValueError(f"Item '{item.description}' has already been completed.")
 
     all_items = _get_ordered_items(db, change.id)
     by_phase = _items_by_phase(all_items)
@@ -183,19 +177,14 @@ def verify_hold_point(
     - Hold point hasn't already been verified
     """
     if change.status != ChangeStatus.EXECUTING:
-        raise ValueError(
-            "Cannot verify hold points — change is not in executing status."
-        )
+        raise ValueError("Cannot verify hold points — change is not in executing status.")
 
     if not item.is_hold_point:
-        raise ValueError(
-            f"Item '{item.description}' is not a hold point."
-        )
+        raise ValueError(f"Item '{item.description}' is not a hold point.")
 
     if not _is_item_completed(item):
         raise ValueError(
-            f"Cannot verify hold point — item '{item.description}' "
-            f"has not been completed yet."
+            f"Cannot verify hold point — item '{item.description}' has not been completed yet."
         )
 
     completion = item.completion
@@ -213,8 +202,7 @@ def verify_hold_point(
         event_type="hold_point_verified",
         actor_name=verified_by,
         description=(
-            f"Hold point verified: '{item.description}' "
-            f"[{item.phase.value}/{item.order}]"
+            f"Hold point verified: '{item.description}' [{item.phase.value}/{item.order}]"
         ),
         event_data={
             "item_id": str(item.id),
@@ -229,9 +217,7 @@ def verify_hold_point(
     return completion
 
 
-def get_execution_status(
-    db: Session, change: Change
-) -> dict:
+def get_execution_status(db: Session, change: Change) -> dict:
     """Get the current execution progress for a change.
 
     Returns:
@@ -272,10 +258,7 @@ def get_execution_status(
                     next_item_id = str(item.id)
                     break
                 # Check if it's a hold point waiting for verification
-                if (
-                    item.is_hold_point
-                    and item.completion.hold_point_verified_by is None
-                ):
+                if item.is_hold_point and item.completion.hold_point_verified_by is None:
                     # Next action is to verify this hold point, but the
                     # "next_item_id" points to the next uncompleted item
                     # (or this hold point if no further items need completion)

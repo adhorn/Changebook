@@ -6,9 +6,7 @@ from app.models.audit import AuditEvent
 from app.models.review import Review, ReviewDecision
 
 
-def assign_reviewer(
-    db: Session, change_id: uuid.UUID, reviewer_name: str
-) -> Review:
+def assign_reviewer(db: Session, change_id: uuid.UUID, reviewer_name: str) -> Review:
     # Check for duplicate
     existing = (
         db.query(Review)
@@ -33,22 +31,11 @@ def assign_reviewer(
 
 
 def list_reviews(db: Session, change_id: uuid.UUID) -> list[Review]:
-    return (
-        db.query(Review)
-        .filter(Review.change_id == change_id)
-        .order_by(Review.created_at)
-        .all()
-    )
+    return db.query(Review).filter(Review.change_id == change_id).order_by(Review.created_at).all()
 
 
-def get_review(
-    db: Session, change_id: uuid.UUID, review_id: uuid.UUID
-) -> Review | None:
-    return (
-        db.query(Review)
-        .filter(Review.id == review_id, Review.change_id == change_id)
-        .first()
-    )
+def get_review(db: Session, change_id: uuid.UUID, review_id: uuid.UUID) -> Review | None:
+    return db.query(Review).filter(Review.id == review_id, Review.change_id == change_id).first()
 
 
 def submit_decision(

@@ -192,7 +192,7 @@ REALISTIC_ITEMS = {
         },
         {
             "description": "Verify p95 connection acquisition latency has improved — should be under 200ms (was ~800ms before)",
-            "command": "kubectl exec -n prod deploy/data-platform -- curl -s localhost:8080/actuator/metrics/hikaricp.connections.acquire | jq '{p95_ms: (.measurements[] | select(.statistic==\"PERCENTILE_95\") | .value * 1000 | round), count: (.measurements[] | select(.statistic==\"COUNT\") | .value)}'",
+            "command": 'kubectl exec -n prod deploy/data-platform -- curl -s localhost:8080/actuator/metrics/hikaricp.connections.acquire | jq \'{p95_ms: (.measurements[] | select(.statistic=="PERCENTILE_95") | .value * 1000 | round), count: (.measurements[] | select(.statistic=="COUNT") | .value)}\'',
         },
         {
             "description": "Check application error rate in the last 15 minutes — should be zero connection timeout errors",
@@ -226,7 +226,6 @@ prod        data-platform-prod-003    11       9      0         50
 
 Total active connections: 38/150 (25.3%)
 No pending requests in queue.""",
-
     "health_check": """{
   "status": "UP",
   "components": {
@@ -260,7 +259,6 @@ No pending requests in queue.""",
     }
   }
 }""",
-
     "target_health": """--------------------------------------------------------------------
 |                     DescribeTargetHealth                          |
 +------------------------+-----------+-----+                       |
@@ -270,7 +268,6 @@ No pending requests in queue.""",
 | i-0bcd234efg567890b    |  healthy  | 8080|                       |
 | i-0cde345fgh678901c    |  healthy  | 8080|                       |
 +------------------------+-----------+-----+""",
-
     "ansible_output": """PLAY [Deploy pool config to data-platform-prod-001] ****************************
 
 TASK [Gathering Facts] ********************************************************
@@ -370,9 +367,7 @@ class TestRealisticContent:
 
     def test_change_created_with_long_content(self, client, sample_change_data):
         """All content is stored and returned without truncation."""
-        change_id, items = _create_executing_change_realistic(
-            client, sample_change_data
-        )
+        change_id, items = _create_executing_change_realistic(client, sample_change_data)
 
         # Verify the change
         resp = client.get(f"/api/v1/changes/{change_id}")
@@ -388,9 +383,7 @@ class TestRealisticContent:
 
     def test_many_items_per_phase(self, client, sample_change_data):
         """8+ items per phase are stored and ordered correctly."""
-        change_id, items = _create_executing_change_realistic(
-            client, sample_change_data
-        )
+        change_id, items = _create_executing_change_realistic(client, sample_change_data)
 
         resp = client.get(f"/api/v1/changes/{change_id}/checklist")
         assert resp.status_code == 200
@@ -412,9 +405,7 @@ class TestRealisticContent:
 
     def test_long_commands_stored_exactly(self, client, sample_change_data):
         """Long multi-flag commands with pipes, ARNs, and JSON are stored verbatim."""
-        change_id, items = _create_executing_change_realistic(
-            client, sample_change_data
-        )
+        change_id, items = _create_executing_change_realistic(client, sample_change_data)
 
         resp = client.get(f"/api/v1/changes/{change_id}/checklist")
         checklist = resp.json()
@@ -433,9 +424,7 @@ class TestRealisticContent:
 
     def test_hold_points_on_realistic_items(self, client, sample_change_data):
         """Hold points are correctly set on specific execution items."""
-        change_id, items = _create_executing_change_realistic(
-            client, sample_change_data
-        )
+        change_id, items = _create_executing_change_realistic(client, sample_change_data)
 
         resp = client.get(f"/api/v1/changes/{change_id}/checklist")
         checklist = resp.json()
@@ -445,15 +434,13 @@ class TestRealisticContent:
 
     def test_completion_with_long_pasted_output(self, client, sample_change_data):
         """Multi-line terminal output can be pasted as the observed result."""
-        change_id, items = _create_executing_change_realistic(
-            client, sample_change_data
-        )
+        change_id, items = _create_executing_change_realistic(client, sample_change_data)
 
         # Complete all pre-flight items with realistic output
         for i, pf_item in enumerate(items["pre_flight"]):
             output = REALISTIC_OUTPUTS.get(
                 "pool_metrics" if i == 0 else "health_check",
-                f"Step {i+1} completed successfully.\n"
+                f"Step {i + 1} completed successfully.\n"
                 f"Checked at: 2025-01-15T14:30:{i:02d}Z\n"
                 f"Result: PASS — all values within expected range.\n"
                 f"Details logged to /var/log/changebook/change-{change_id[:8]}.log",
@@ -472,9 +459,7 @@ class TestRealisticContent:
 
     def test_execution_status_with_many_items(self, client, sample_change_data):
         """Execution status correctly tracks progress across 23 items."""
-        change_id, items = _create_executing_change_realistic(
-            client, sample_change_data
-        )
+        change_id, items = _create_executing_change_realistic(client, sample_change_data)
 
         resp = client.get(f"/api/v1/changes/{change_id}/execution-status")
         data = resp.json()
@@ -487,14 +472,10 @@ class TestRealisticContent:
 
     def test_full_lifecycle_with_realistic_content(self, client, sample_change_data):
         """Complete all 23 items and transition to done — the full lifecycle."""
-        change_id, items = _create_executing_change_realistic(
-            client, sample_change_data
-        )
+        change_id, items = _create_executing_change_realistic(client, sample_change_data)
 
         # Complete all items across all phases
-        all_items = (
-            items["pre_flight"] + items["execution"] + items["verification"]
-        )
+        all_items = items["pre_flight"] + items["execution"] + items["verification"]
         hold_point_ids = set()
 
         for i, item_data in enumerate(all_items):
@@ -514,18 +495,19 @@ class TestRealisticContent:
                 f"/api/v1/changes/{change_id}/checklist/{item_data['id']}/complete",
                 json={
                     "observed_result": REALISTIC_OUTPUTS.get(
-                        "ansible_output" if "ansible" in (item_data.get("command") or "").lower()
-                        else "target_health" if "describe-target" in (item_data.get("command") or "")
+                        "ansible_output"
+                        if "ansible" in (item_data.get("command") or "").lower()
+                        else "target_health"
+                        if "describe-target" in (item_data.get("command") or "")
                         else "health_check",
-                        f"Step {i+1}/{len(all_items)} completed. Output verified against expected outcome.",
+                        f"Step {i + 1}/{len(all_items)} completed. Output verified against expected outcome.",
                     ),
                     "status": "completed",
                     "completed_by": "Adrian Hornsby",
                 },
             )
             assert resp.status_code == 200, (
-                f"Failed to complete item {i+1} ({item_data['description'][:60]}): "
-                f"{resp.json()}"
+                f"Failed to complete item {i + 1} ({item_data['description'][:60]}): {resp.json()}"
             )
 
         # Verify the last hold point (in verification phase)
@@ -551,9 +533,7 @@ class TestRealisticContent:
 
     def test_markdown_export_with_realistic_content(self, client, sample_change_data):
         """Markdown export handles long content without truncation."""
-        change_id, items = _create_executing_change_realistic(
-            client, sample_change_data
-        )
+        change_id, items = _create_executing_change_realistic(client, sample_change_data)
 
         resp = client.get(f"/api/v1/changes/{change_id}/export/markdown")
         assert resp.status_code == 200
@@ -571,9 +551,7 @@ class TestRealisticContent:
 
     def test_duplicate_preserves_long_content(self, client, sample_change_data):
         """Duplicating a change with realistic content preserves everything."""
-        change_id, items = _create_executing_change_realistic(
-            client, sample_change_data
-        )
+        change_id, items = _create_executing_change_realistic(client, sample_change_data)
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/duplicate",

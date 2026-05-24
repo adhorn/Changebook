@@ -27,8 +27,7 @@ class ChangeCreate(BaseModel):
         invalid = [tag for tag in v if tag not in ALLOWED_DEFENCE_TAGS]
         if invalid:
             raise ValueError(
-                f"Invalid defence tags: {invalid}. "
-                f"Allowed tags: {ALLOWED_DEFENCE_TAGS}"
+                f"Invalid defence tags: {invalid}. Allowed tags: {ALLOWED_DEFENCE_TAGS}"
             )
         return v
 
@@ -58,8 +57,7 @@ class ChangeUpdate(BaseModel):
         invalid = [tag for tag in v if tag not in ALLOWED_DEFENCE_TAGS]
         if invalid:
             raise ValueError(
-                f"Invalid defence tags: {invalid}. "
-                f"Allowed tags: {ALLOWED_DEFENCE_TAGS}"
+                f"Invalid defence tags: {invalid}. Allowed tags: {ALLOWED_DEFENCE_TAGS}"
             )
         return v
 

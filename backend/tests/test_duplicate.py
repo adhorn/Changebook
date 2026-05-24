@@ -218,9 +218,7 @@ class TestDuplicateFreshState:
         reviews = client.get(f"/api/v1/changes/{clone_id}/reviewers").json()
         assert reviews == []
 
-    def test_clone_checklist_items_have_no_completions(
-        self, client, sample_change_data
-    ):
+    def test_clone_checklist_items_have_no_completions(self, client, sample_change_data):
         """Cloned checklist items have no completion records."""
         source_id = _create_source_change(client, sample_change_data)
 
