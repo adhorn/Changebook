@@ -136,7 +136,10 @@ function ChecklistItemRow({
         <div className="flex-1 min-w-0">
           <p className="text-sm text-gray-900">{item.description}</p>
           {item.command && (
-            <pre className="mt-1 bg-gray-50 rounded p-2 text-xs font-mono text-gray-700 overflow-x-auto">
+            <pre
+              className="mt-1 bg-gray-50 rounded p-2 text-xs font-mono text-gray-700 overflow-x-auto"
+              style={{ whiteSpace: "pre", hyphens: "none", wordBreak: "keep-all" }}
+            >
               {item.command}
             </pre>
           )}
@@ -182,7 +185,10 @@ function ChecklistItemRow({
                   {formatDate(completion.completed_at)}
                 </span>
               </div>
-              <pre className="mt-1 bg-gray-50 rounded p-2 font-mono text-gray-700 whitespace-pre-wrap overflow-x-auto">
+              <pre
+                className="mt-1 bg-gray-50 rounded p-2 font-mono text-gray-700 whitespace-pre-wrap overflow-x-auto"
+                style={{ hyphens: "none", wordBreak: "keep-all" }}
+              >
                 {completion.observed_result}
               </pre>
               {completion.hold_point_verified_by && (
