@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import UserSwitcher from "@/components/UserSwitcher";
+import { getCurrentUser } from "@/lib/auth";
 import {
   api,
   Change,
@@ -567,6 +568,18 @@ export default function ChangeDetailPage() {
   const router = useRouter();
   const id = params.id as string;
 
+  const [currentUserName, setCurrentUserName] = useState(getCurrentUser().name);
+
+  // Listen for user switches
+  useEffect(() => {
+    function handleUserChanged(e: Event) {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.name) setCurrentUserName(detail.name);
+    }
+    window.addEventListener("user-changed", handleUserChanged);
+    return () => window.removeEventListener("user-changed", handleUserChanged);
+  }, []);
+
   const [change, setChange] = useState<Change | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -814,6 +827,8 @@ export default function ChangeDetailPage() {
   const isExecuting = change.status === "executing";
   const isDraft = change.status === "draft";
   const isTerminal = change.status === "done" || change.status === "aborted";
+  const isAuthor = currentUserName === change.author_name;
+  const canEdit = isDraft && isAuthor;
 
   // Group checklist by phase
   const checklistByPhase: Record<string, ChecklistItem[]> = {};
@@ -920,7 +935,7 @@ export default function ChangeDetailPage() {
             </div>
             <div className="flex items-center gap-3">
               <UserSwitcher />
-              {isDraft && !editingDetails && (
+              {canEdit && !editingDetails && (
                 <button
                   onClick={startEditingDetails}
                   className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -943,7 +958,7 @@ export default function ChangeDetailPage() {
               >
                 Duplicate
               </button>
-              {!isTerminal && (
+              {!isTerminal && isAuthor && (
                 <button
                   onClick={() => setShowAbort(!showAbort)}
                   className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50"
@@ -951,7 +966,7 @@ export default function ChangeDetailPage() {
                   {showAbort ? "Cancel" : "Abort"}
                 </button>
               )}
-              {transitions.map((t) => (
+              {isAuthor && transitions.map((t) => (
                 <button
                   key={t.target}
                   onClick={() => handleTransition(t.target)}
@@ -1208,7 +1223,7 @@ export default function ChangeDetailPage() {
                   {preflightExpanded ? "▾" : "▸"}
                 </span>
               </button>
-              {isDraft && !preflightEditing && (
+              {canEdit && !preflightEditing && (
                 <button
                   onClick={startEditingPreflight}
                   className="ml-4 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -1376,7 +1391,7 @@ export default function ChangeDetailPage() {
                         item={item}
                         isNext={execStatus?.next_item_id === item.id}
                         isExecuting={isExecuting}
-                        isDraft={isDraft}
+                        isDraft={canEdit}
                         changeId={id}
                         onCompleted={loadAll}
                       />
@@ -1385,7 +1400,7 @@ export default function ChangeDetailPage() {
                 )}
 
                 {/* Per-phase add form — appears below the last item */}
-                {isDraft && isAddingHere && (
+                {canEdit && isAddingHere && (
                   <div
                     className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2"
                     ref={(el) => {
@@ -1472,7 +1487,7 @@ export default function ChangeDetailPage() {
                 )}
 
                 {/* Add button at the bottom of each phase */}
-                {isDraft && !isAddingHere && (
+                {canEdit && !isAddingHere && (
                   <button
                     onClick={() => {
                       setAddingToPhase(phase);
@@ -1508,7 +1523,8 @@ export default function ChangeDetailPage() {
                   review={review}
                   canDecide={
                     review.decision === "pending" &&
-                    change.status === "in_review"
+                    change.status === "in_review" &&
+                    currentUserName === review.reviewer_name
                   }
                   onDecision={(decision, comment) =>
                     handleReviewDecision(review.id, decision, comment)
@@ -1518,8 +1534,8 @@ export default function ChangeDetailPage() {
             </div>
           )}
 
-          {/* Assign reviewer */}
-          {!isTerminal && (
+          {/* Assign reviewer — only the author can assign */}
+          {!isTerminal && isAuthor && (
             <>
               {!addingReviewer ? (
                 <button

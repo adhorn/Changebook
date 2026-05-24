@@ -5,6 +5,8 @@ human-readable output including metadata, pre-flight answers, checklist
 with completion records, review decisions, and audit trail.
 """
 
+from tests.conftest import JANE
+
 
 def _complete_preflight(client):
     resp = client.get("/api/v1/preflight-questions")
@@ -54,7 +56,7 @@ def _move_to_executing(client, change_id):
     """Move a change through review to executing."""
     client.post(
         f"/api/v1/changes/{change_id}/transition",
-        params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+        params={"target_status": "in_review"},
     )
     review = client.post(
         f"/api/v1/changes/{change_id}/reviewers",
@@ -63,14 +65,15 @@ def _move_to_executing(client, change_id):
     client.post(
         f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
         json={"decision": "approved", "comment": "Looks good."},
+        headers=JANE,
     )
     client.post(
         f"/api/v1/changes/{change_id}/transition",
-        params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+        params={"target_status": "approved"},
     )
     client.post(
         f"/api/v1/changes/{change_id}/transition",
-        params={"target_status": "executing", "actor_name": "Adrian Hornsby"},
+        params={"target_status": "executing"},
     )
 
 
@@ -149,7 +152,6 @@ class TestExportWithExecution:
             json={
                 "observed_result": "Pool size confirmed at 100",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -168,7 +170,7 @@ class TestExportWithReviews:
         # Move to in_review and get a review
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         review = client.post(
             f"/api/v1/changes/{change_id}/reviewers",
@@ -177,6 +179,7 @@ class TestExportWithReviews:
         client.post(
             f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
             json={"decision": "approved", "comment": "Well planned, LGTM."},
+            headers=JANE,
         )
 
         md = client.get(f"/api/v1/changes/{change_id}/export/markdown").text

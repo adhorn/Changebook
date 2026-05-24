@@ -216,7 +216,7 @@ class TestPreflightValidationOnTransition:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 422
         assert "change profile" in resp.json()["detail"].lower()
@@ -233,7 +233,7 @@ class TestPreflightValidationOnTransition:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 422
         assert "change profile" in resp.json()["detail"].lower()
@@ -247,7 +247,7 @@ class TestPreflightValidationOnTransition:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 422
 
@@ -266,7 +266,7 @@ class TestPreflightValidationOnTransition:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "in_review"
@@ -277,7 +277,7 @@ class TestPreflightValidationOnTransition:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "aborted", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "aborted"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "aborted"

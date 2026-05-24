@@ -7,6 +7,7 @@ The execution model enforces:
 - Only works when the change is in 'executing' status
 - Each completion records who, when, what was observed
 """
+from tests.conftest import JANE, BOB
 
 
 def _complete_preflight(client):
@@ -59,23 +60,24 @@ def _create_executing_change(client, sample_change_data, items=None):
     # Move to executing: draft → in_review → approved → executing
     client.post(
         f"/api/v1/changes/{change_id}/transition",
-        params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+        params={"target_status": "in_review"},
     )
     review = client.post(
         f"/api/v1/changes/{change_id}/reviewers",
-        json={"reviewer_name": "Reviewer"},
+        json={"reviewer_name": "Jane Smith"},
     )
     client.post(
         f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
         json={"decision": "approved"},
+        headers=JANE,
     )
     client.post(
         f"/api/v1/changes/{change_id}/transition",
-        params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+        params={"target_status": "approved"},
     )
     client.post(
         f"/api/v1/changes/{change_id}/transition",
-        params={"target_status": "executing", "actor_name": "Adrian Hornsby"},
+        params={"target_status": "executing"},
     )
 
     return change_id, created_items
@@ -94,12 +96,11 @@ class TestSequentialUnlock:
             json={
                 "observed_result": "Backup verified — 2.3GB snapshot from 10 minutes ago",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "completed"
-        assert resp.json()["completed_by"] == "Adrian Hornsby"
+        assert resp.json()["completed_by"] == "Test User"
         assert resp.json()["observed_result"] is not None
 
     def test_cannot_complete_second_item_before_first(self, client, sample_change_data):
@@ -120,7 +121,6 @@ class TestSequentialUnlock:
             json={
                 "observed_result": "Connected",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 422
@@ -144,7 +144,6 @@ class TestSequentialUnlock:
             json={
                 "observed_result": "Backup OK",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -154,7 +153,6 @@ class TestSequentialUnlock:
             json={
                 "observed_result": "Connected OK",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 200
@@ -169,7 +167,6 @@ class TestSequentialUnlock:
             json={
                 "observed_result": "Done",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -178,7 +175,6 @@ class TestSequentialUnlock:
             json={
                 "observed_result": "Done again",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 422
@@ -198,7 +194,6 @@ class TestPhaseGating:
             json={
                 "observed_result": "Migration ran",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 422
@@ -214,7 +209,6 @@ class TestPhaseGating:
             json={
                 "observed_result": "Backup verified",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -224,7 +218,6 @@ class TestPhaseGating:
             json={
                 "observed_result": "Migration applied, 42 rows updated",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 200
@@ -239,7 +232,6 @@ class TestPhaseGating:
             json={
                 "observed_result": "OK",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -249,7 +241,6 @@ class TestPhaseGating:
             json={
                 "observed_result": "Healthy",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 422
@@ -277,7 +268,6 @@ class TestHoldPoints:
             json={
                 "observed_result": "OK",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -287,7 +277,6 @@ class TestHoldPoints:
             json={
                 "observed_result": "Config applied",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -297,7 +286,6 @@ class TestHoldPoints:
             json={
                 "observed_result": "Restarted",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 422
@@ -321,7 +309,6 @@ class TestHoldPoints:
             json={
                 "observed_result": "OK",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -331,14 +318,14 @@ class TestHoldPoints:
             json={
                 "observed_result": "Config applied",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
         # Verify the hold point
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
-            json={"verified_by": "Jane Smith"},
+            json={},
+            headers=JANE,
         )
         assert resp.status_code == 200
         assert resp.json()["hold_point_verified_by"] == "Jane Smith"
@@ -362,7 +349,6 @@ class TestHoldPoints:
             json={
                 "observed_result": "OK",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -372,14 +358,14 @@ class TestHoldPoints:
             json={
                 "observed_result": "Config applied",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
         # Verify hold point
         client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
-            json={"verified_by": "Jane Smith"},
+            json={},
+            headers=JANE,
         )
 
         # Now next item should unlock
@@ -388,7 +374,6 @@ class TestHoldPoints:
             json={
                 "observed_result": "Service restarted, PID 4821",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 200
@@ -403,13 +388,13 @@ class TestHoldPoints:
             json={
                 "observed_result": "OK",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/hold-point-verify",
-            json={"verified_by": "Jane Smith"},
+            json={},
+            headers=JANE,
         )
         assert resp.status_code == 422
         assert "hold" in resp.json()["detail"].lower()
@@ -427,7 +412,8 @@ class TestHoldPoints:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
-            json={"verified_by": "Jane Smith"},
+            json={},
+            headers=JANE,
         )
         assert resp.status_code == 422
 
@@ -444,7 +430,6 @@ class TestCompletionStatuses:
             json={
                 "observed_result": "Backup exists but is 6 hours old, not recent",
                 "status": "flagged",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 200
@@ -459,7 +444,6 @@ class TestCompletionStatuses:
             json={
                 "observed_result": "Backup service is down, but change is low-risk and reversible",
                 "status": "skipped_with_justification",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 200
@@ -493,7 +477,6 @@ class TestStatusGate:
             json={
                 "observed_result": "Done",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 422
@@ -511,14 +494,13 @@ class TestStatusGate:
                     json={
                         "observed_result": "Done",
                         "status": "completed",
-                        "completed_by": "Adrian Hornsby",
                     },
                 )
 
         # Transition to done
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "done", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "done"},
         )
 
         # Try completing again — should fail
@@ -527,7 +509,6 @@ class TestStatusGate:
             json={
                 "observed_result": "Redo",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 422
@@ -559,7 +540,6 @@ class TestExecutionStatus:
             json={
                 "observed_result": "OK",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -580,7 +560,6 @@ class TestExecutionStatus:
                     json={
                         "observed_result": "Done",
                         "status": "completed",
-                        "completed_by": "Adrian Hornsby",
                     },
                 )
 
@@ -619,7 +598,6 @@ class TestExecutionAudit:
             json={
                 "observed_result": "Backup verified",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
@@ -634,7 +612,7 @@ class TestExecutionAudit:
             .all()
         )
         assert len(events) == 1
-        assert events[0].actor_name == "Adrian Hornsby"
+        assert events[0].actor_name == "Test User"
 
     def test_hold_point_verification_creates_audit(self, client, sample_change_data, db):
         """Hold-point verification is recorded in the audit trail."""
@@ -653,14 +631,14 @@ class TestExecutionAudit:
             json={
                 "observed_result": "Checked",
                 "status": "completed",
-                "completed_by": "Adrian Hornsby",
             },
         )
 
         # Verify
         client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/hold-point-verify",
-            json={"verified_by": "Jane Smith"},
+            json={},
+            headers=JANE,
         )
 
         from app.models.audit import AuditEvent

@@ -9,6 +9,10 @@ commands. This module verifies the system handles production-scale content:
 - Long pre-flight answers with paragraphs
 """
 
+from tests.conftest import BOB
+
+SENIOR = {"X-User-Email": "senior@changebook.dev", "X-User-Name": "Senior Engineer"}
+
 
 def _complete_preflight_realistic(client):
     """Build realistic pre-flight answers — full sentences, not stubs."""
@@ -340,7 +344,7 @@ def _create_executing_change_realistic(client, sample_change_data):
     # Move to executing: draft → in_review → approved → executing
     client.post(
         f"/api/v1/changes/{change_id}/transition",
-        params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+        params={"target_status": "in_review"},
     )
     review = client.post(
         f"/api/v1/changes/{change_id}/reviewers",
@@ -349,14 +353,15 @@ def _create_executing_change_realistic(client, sample_change_data):
     client.post(
         f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
         json={"decision": "approved", "comment": "Staging results look solid. Approved."},
+        headers=SENIOR,
     )
     client.post(
         f"/api/v1/changes/{change_id}/transition",
-        params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+        params={"target_status": "approved"},
     )
     client.post(
         f"/api/v1/changes/{change_id}/transition",
-        params={"target_status": "executing", "actor_name": "Adrian Hornsby"},
+        params={"target_status": "executing"},
     )
 
     return change_id, created_items
@@ -450,7 +455,6 @@ class TestRealisticContent:
                 json={
                     "observed_result": output,
                     "status": "completed",
-                    "completed_by": "Adrian Hornsby",
                 },
             )
             assert resp.status_code == 200
@@ -488,7 +492,8 @@ class TestRealisticContent:
                 prev_id = all_items[i - 1]["id"]
                 client.post(
                     f"/api/v1/changes/{change_id}/checklist/{prev_id}/hold-point-verify",
-                    json={"verified_by": "Senior Engineer"},
+                    json={},
+                    headers=SENIOR,
                 )
 
             resp = client.post(
@@ -503,7 +508,6 @@ class TestRealisticContent:
                         f"Step {i + 1}/{len(all_items)} completed. Output verified against expected outcome.",
                     ),
                     "status": "completed",
-                    "completed_by": "Adrian Hornsby",
                 },
             )
             assert resp.status_code == 200, (
@@ -514,7 +518,8 @@ class TestRealisticContent:
         last_hold = [i for i in all_items if i["id"] in hold_point_ids][-1]
         client.post(
             f"/api/v1/changes/{change_id}/checklist/{last_hold['id']}/hold-point-verify",
-            json={"verified_by": "Senior Engineer"},
+            json={},
+            headers=SENIOR,
         )
 
         # Check execution status — all done
@@ -526,7 +531,7 @@ class TestRealisticContent:
         # Transition to done
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "done", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "done"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "done"

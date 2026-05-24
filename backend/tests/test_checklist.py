@@ -123,7 +123,7 @@ class TestCreateChecklistItem:
         # Move to aborted (no preflight needed)
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "aborted", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "aborted"},
         )
 
         resp = client.post(
@@ -343,7 +343,7 @@ class TestUpdateChecklistItem:
 
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "aborted", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "aborted"},
         )
 
         resp = client.patch(
@@ -424,7 +424,7 @@ class TestDeleteChecklistItem:
 
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "aborted", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "aborted"},
         )
 
         resp = client.delete(f"/api/v1/changes/{change_id}/checklist/{item_id}")
@@ -519,7 +519,7 @@ class TestReorderChecklistItems:
 
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "aborted", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "aborted"},
         )
 
         resp = client.put(

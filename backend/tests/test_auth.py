@@ -133,7 +133,7 @@ class TestAuthorCannotApprove:
         assert "own change" in resp.json()["detail"].lower()
 
     def test_different_user_can_review(self, client, sample_change_data):
-        """Alice creates, Bob reviews — this should work."""
+        """Alice creates, assigns Bob as reviewer — this should work."""
         change_id = _create_change(client, sample_change_data, ALICE)
         _add_items_to_all_phases(client, change_id, ALICE)
 
@@ -143,17 +143,17 @@ class TestAuthorCannotApprove:
             headers=ALICE,
         )
 
-        # Bob assigns himself as reviewer — should work
+        # Alice assigns Bob as reviewer
         resp = client.post(
             f"/api/v1/changes/{change_id}/reviewers",
-            json={},
-            headers=BOB,
+            json={"reviewer_name": "Bob Reviewer"},
+            headers=ALICE,
         )
         assert resp.status_code == 201
         assert resp.json()["reviewer_name"] == "Bob Reviewer"
 
     def test_reviewer_can_approve(self, client, sample_change_data):
-        """Bob reviews and approves Alice's change."""
+        """Alice assigns Bob, Bob approves — this should work."""
         change_id = _create_change(client, sample_change_data, ALICE)
         _add_items_to_all_phases(client, change_id, ALICE)
 
@@ -163,11 +163,11 @@ class TestAuthorCannotApprove:
             headers=ALICE,
         )
 
-        # Bob assigns himself and approves
+        # Alice assigns Bob as reviewer, Bob approves
         review = client.post(
             f"/api/v1/changes/{change_id}/reviewers",
-            json={},
-            headers=BOB,
+            json={"reviewer_name": "Bob Reviewer"},
+            headers=ALICE,
         )
         resp = client.post(
             f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
@@ -193,8 +193,8 @@ class TestAuthOnExecution:
         )
         review = client.post(
             f"/api/v1/changes/{change_id}/reviewers",
-            json={},
-            headers=BOB,
+            json={"reviewer_name": "Bob Reviewer"},
+            headers=ALICE,
         )
         client.post(
             f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",

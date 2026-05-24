@@ -7,6 +7,8 @@ These tests define the expected behaviour:
 - Audit trail is recorded
 """
 
+from tests.conftest import JANE
+
 
 def test_create_change(client, sample_change_data):
     """A change can be created with customer, service, environment, and pre-flight answers."""
@@ -136,11 +138,12 @@ class TestStateTransitions:
         """Assign a reviewer and approve so the change can transition to approved."""
         review = client.post(
             f"/api/v1/changes/{change_id}/reviewers",
-            json={"reviewer_name": "Reviewer"},
+            json={"reviewer_name": "Jane Smith"},
         )
         client.post(
             f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
             json={"decision": "approved"},
+            headers=JANE,
         )
 
     def _create_change(self, client, sample_change_data, ready_for_review=False):
@@ -161,7 +164,7 @@ class TestStateTransitions:
         change_id = self._create_change(client, sample_change_data, ready_for_review=True)
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "in_review"
@@ -171,7 +174,7 @@ class TestStateTransitions:
         change_id = self._create_change(client, sample_change_data, ready_for_review=True)
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "executing", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "executing"},
         )
         assert resp.status_code == 422
 
@@ -182,7 +185,7 @@ class TestStateTransitions:
         # Submit for review
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         # Approve (requires reviewer)
         self._approve_change(client, change_id)
@@ -190,7 +193,7 @@ class TestStateTransitions:
         for status in ["approved", "executing", "done"]:
             resp = client.post(
                 f"/api/v1/changes/{change_id}/transition",
-                params={"target_status": status, "actor_name": "Adrian Hornsby"},
+                params={"target_status": status},
             )
             assert resp.status_code == 200, f"Failed transition to {status}: {resp.json()}"
             assert resp.json()["status"] == status
@@ -200,7 +203,7 @@ class TestStateTransitions:
         change_id = self._create_change(client, sample_change_data)
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "aborted", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "aborted"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "aborted"
@@ -210,18 +213,18 @@ class TestStateTransitions:
         change_id = self._create_change(client, sample_change_data, ready_for_review=True)
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         self._approve_change(client, change_id)
         for status in ["approved", "executing", "done"]:
             client.post(
                 f"/api/v1/changes/{change_id}/transition",
-                params={"target_status": status, "actor_name": "Adrian Hornsby"},
+                params={"target_status": status},
             )
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "draft", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "draft"},
         )
         assert resp.status_code == 422
 

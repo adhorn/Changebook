@@ -57,7 +57,7 @@ class TestDuplicateBasics:
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         assert resp.status_code == 201
         clone = resp.json()
@@ -71,7 +71,7 @@ class TestDuplicateBasics:
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         assert "Connection pool resize" in resp.json()["title"]
         assert "(copy)" in resp.json()["title"]
@@ -82,7 +82,7 @@ class TestDuplicateBasics:
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         assert resp.json()["description"] == "Increase max connections from 100 to 150"
 
@@ -93,7 +93,7 @@ class TestDuplicateBasics:
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         clone = resp.json()
         assert clone["preflight_answers"] == source["preflight_answers"]
@@ -105,7 +105,7 @@ class TestDuplicateBasics:
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         assert resp.json()["defence_tags"] == ["database", "monitoring"]
 
@@ -115,7 +115,7 @@ class TestDuplicateBasics:
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         clone_id = resp.json()["id"]
 
@@ -137,7 +137,7 @@ class TestDuplicateBasics:
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         clone_id = resp.json()["id"]
 
@@ -157,7 +157,6 @@ class TestDuplicateOverrides:
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
             json={
-                "author_name": "Adrian Hornsby",
                 "title": "Connection pool resize on PROD-US",
             },
         )
@@ -177,7 +176,6 @@ class TestDuplicateOverrides:
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
             json={
-                "author_name": "Adrian Hornsby",
                 "environment_id": new_env_id,
             },
         )
@@ -185,15 +183,17 @@ class TestDuplicateOverrides:
         assert clone["environment_id"] == new_env_id
         assert clone["customer_id"] == sample_change_data["customer_id"]
 
-    def test_override_author(self, client, sample_change_data):
-        """A different operator can duplicate a change."""
+    def test_author_comes_from_auth_headers(self, client, sample_change_data):
+        """The clone's author is always the authenticated user, not a body field."""
         source_id = _create_source_change(client, sample_change_data)
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Jane Smith"},
+            json={},
         )
-        assert resp.json()["author_name"] == "Jane Smith"
+        assert resp.status_code == 201
+        # Author comes from the default test client headers ("Test User")
+        assert resp.json()["author_name"] == "Test User"
 
 
 class TestDuplicateFreshState:
@@ -211,7 +211,7 @@ class TestDuplicateFreshState:
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         clone_id = resp.json()["id"]
 
@@ -224,7 +224,7 @@ class TestDuplicateFreshState:
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         clone_id = resp.json()["id"]
 
@@ -243,7 +243,7 @@ class TestDuplicateFreshState:
         """Duplicating a non-existent change returns 404."""
         resp = client.post(
             "/api/v1/changes/00000000-0000-0000-0000-000000000000/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         assert resp.status_code == 404
 
@@ -257,7 +257,7 @@ class TestDuplicateAudit:
 
         resp = client.post(
             f"/api/v1/changes/{source_id}/duplicate",
-            json={"author_name": "Adrian Hornsby"},
+            json={},
         )
         clone_id = resp.json()["id"]
 

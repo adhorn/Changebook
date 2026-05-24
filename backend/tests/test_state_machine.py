@@ -8,6 +8,8 @@ The state machine enforces:
 
 from datetime import UTC, datetime, timedelta
 
+from tests.conftest import JANE
+
 
 def _complete_preflight(client):
     """Build a complete set of pre-flight answers from the API."""
@@ -47,11 +49,12 @@ def _approve_change(client, change_id):
     """Assign a reviewer and approve."""
     review = client.post(
         f"/api/v1/changes/{change_id}/reviewers",
-        json={"reviewer_name": "Reviewer"},
+        json={"reviewer_name": "Jane Smith"},
     )
     client.post(
         f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
         json={"decision": "approved"},
+        headers=JANE,
     )
 
 
@@ -64,7 +67,7 @@ class TestCompletenessGate:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 422
         assert "checklist" in resp.json()["detail"].lower()
@@ -80,7 +83,7 @@ class TestCompletenessGate:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 422
         assert "checklist" in resp.json()["detail"].lower()
@@ -100,7 +103,7 @@ class TestCompletenessGate:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 422
 
@@ -111,7 +114,7 @@ class TestCompletenessGate:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "in_review"
@@ -127,7 +130,7 @@ class TestCompletenessGate:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         detail = resp.json()["detail"].lower()
         assert "pre_flight" in detail
@@ -146,7 +149,7 @@ class TestFullLifecycleWithGates:
         # Submit for review
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         assert resp.status_code == 200
 
@@ -156,7 +159,7 @@ class TestFullLifecycleWithGates:
         for status in ["approved", "executing", "done"]:
             resp = client.post(
                 f"/api/v1/changes/{change_id}/transition",
-                params={"target_status": status, "actor_name": "Adrian Hornsby"},
+                params={"target_status": status},
             )
             assert resp.status_code == 200, f"Failed transition to {status}: {resp.json()}"
             assert resp.json()["status"] == status
@@ -168,7 +171,7 @@ class TestFullLifecycleWithGates:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "aborted", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "aborted"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "aborted"
@@ -180,12 +183,12 @@ class TestFullLifecycleWithGates:
 
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "draft", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "draft"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "draft"
@@ -201,13 +204,13 @@ class TestStalenessWarning:
 
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         _approve_change(client, change_id)
         for status in ["approved", "executing"]:
             client.post(
                 f"/api/v1/changes/{change_id}/transition",
-                params={"target_status": status, "actor_name": "Adrian Hornsby"},
+                params={"target_status": status},
             )
 
         # Check audit trail — no staleness event
@@ -224,12 +227,12 @@ class TestStalenessWarning:
         # Move to approved
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         _approve_change(client, change_id)
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "approved"},
         )
 
         # Backdate the preflight_answered_at to 48h ago
@@ -242,7 +245,7 @@ class TestStalenessWarning:
         # Transition to executing — should succeed but with staleness warning
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "executing", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "executing"},
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "executing"
@@ -270,12 +273,12 @@ class TestStalenessWarning:
 
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "in_review", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "in_review"},
         )
         _approve_change(client, change_id)
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "approved", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "approved"},
         )
 
         from app.models.change import Change
@@ -286,7 +289,7 @@ class TestStalenessWarning:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "executing", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "executing"},
         )
         assert resp.status_code == 200
 
@@ -302,7 +305,6 @@ class TestAbortReason:
             f"/api/v1/changes/{change_id}/transition",
             params={
                 "target_status": "aborted",
-                "actor_name": "Adrian Hornsby",
                 "reason": "Customer requested postponement due to quarter-end freeze",
             },
         )
@@ -334,7 +336,6 @@ class TestAbortReason:
             f"/api/v1/changes/{change_id}/transition",
             params={
                 "target_status": "aborted",
-                "actor_name": "Adrian Hornsby",
             },
         )
         assert resp.status_code == 200

@@ -33,7 +33,6 @@ class ChangeCreate(BaseModel):
 
 
 class ChangeDuplicate(BaseModel):
-    author_name: str | None = None  # Injected from auth headers
     title: str | None = None
     customer_id: uuid.UUID | None = None
     service_id: uuid.UUID | None = None

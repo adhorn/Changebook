@@ -81,6 +81,11 @@ def org_and_team(client):
     return {"org_id": team_data["organisation_id"], "team_id": team_data["id"]}
 
 
+# Standard test user identities — use as headers= on requests
+JANE = {"X-User-Email": "jane@changebook.dev", "X-User-Name": "Jane Smith"}
+BOB = {"X-User-Email": "bob@changebook.dev", "X-User-Name": "Bob Johnson"}
+
+
 @pytest.fixture
 def sample_change_data(client, org_and_team):
     """Create a customer, service, and environment — the minimum needed for a change."""

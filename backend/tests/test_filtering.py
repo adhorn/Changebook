@@ -212,7 +212,7 @@ class TestAuditEventCount:
         # Abort it (generates a status_changed event)
         client.post(
             f"/api/v1/changes/{change_id}/transition",
-            params={"target_status": "aborted", "actor_name": "Adrian Hornsby"},
+            params={"target_status": "aborted"},
         )
 
         resp = client.get("/api/v1/changes")
