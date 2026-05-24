@@ -7,7 +7,7 @@ The execution model enforces:
 - Only works when the change is in 'executing' status
 - Each completion records who, when, what was observed
 """
-from tests.conftest import JANE, BOB
+from tests.conftest import JANE
 
 
 def _complete_preflight(client):

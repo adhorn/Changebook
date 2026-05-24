@@ -9,8 +9,6 @@ commands. This module verifies the system handles production-scale content:
 - Long pre-flight answers with paragraphs
 """
 
-from tests.conftest import BOB
-
 SENIOR = {"X-User-Email": "senior@changebook.dev", "X-User-Name": "Senior Engineer"}
 
 

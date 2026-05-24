@@ -4,7 +4,7 @@ Reviewers are assigned to a change. All must approve before the change
 can transition to approved. Any edit after approval resets all reviews.
 """
 
-from tests.conftest import JANE, BOB
+from tests.conftest import BOB, JANE
 
 VP_RISK = {"X-User-Email": "vprisk@changebook.dev", "X-User-Name": "VP Risk"}
 

@@ -404,7 +404,8 @@ def verify_hold_point(
     if item.completion and item.completion.completed_by == user.name:
         raise HTTPException(
             status_code=422,
-            detail="Hold point must be verified by a different person than the one who completed the item.",
+            detail="Hold point must be verified by a different person "
+            "than the one who completed the item.",
         )
 
     try:
