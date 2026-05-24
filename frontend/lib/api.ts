@@ -55,6 +55,7 @@ export interface Change {
   preflight_schema_version: string | null;
   defence_tags: string[] | null;
   cloned_from: string | null;
+  abort_reason: string | null;
   created_at: string;
   updated_at: string;
   audit_event_count?: number;

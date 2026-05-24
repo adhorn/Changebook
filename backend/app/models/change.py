@@ -69,6 +69,9 @@ class Change(UUIDMixin, TimestampMixin, Base):
     # Defence tags — validated against ALLOWED_DEFENCE_TAGS
     defence_tags: Mapped[list | None] = mapped_column(PortableJSON, nullable=True)
 
+    # Abort reason — recorded when the change is aborted
+    abort_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     # Duplicate flow — reference to the change this was cloned from
     cloned_from: Mapped[uuid.UUID | None] = mapped_column(
         PortableUUID, ForeignKey("changes.id"), nullable=True

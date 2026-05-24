@@ -79,6 +79,7 @@ class ChangeResponse(BaseModel):
     preflight_schema_version: str | None
     defence_tags: list[str] | None
     cloned_from: uuid.UUID | None
+    abort_reason: str | None = None
     created_at: datetime
     updated_at: datetime
     audit_event_count: int | None = None
