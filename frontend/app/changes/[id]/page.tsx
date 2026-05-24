@@ -658,9 +658,14 @@ export default function ChangeDetailPage() {
     setTransitioning(false);
   }
 
-  async function handleAddReviewer() {
+  const [reviewerName, setReviewerName] = useState("");
+  const [addingReviewer, setAddingReviewer] = useState(false);
+
+  async function handleAddReviewer(name?: string) {
     try {
-      await api.assignReviewer(id);
+      await api.assignReviewer(id, name?.trim() || undefined);
+      setReviewerName("");
+      setAddingReviewer(false);
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add reviewer");
@@ -1513,14 +1518,46 @@ export default function ChangeDetailPage() {
             </div>
           )}
 
-          {/* Assign yourself as reviewer */}
+          {/* Assign reviewer */}
           {!isTerminal && (
-            <button
-              onClick={handleAddReviewer}
-              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-            >
-              Assign myself as reviewer
-            </button>
+            <>
+              {!addingReviewer ? (
+                <button
+                  onClick={() => setAddingReviewer(true)}
+                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  + Assign reviewer
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={reviewerName}
+                    onChange={(e) => setReviewerName(e.target.value)}
+                    placeholder="Reviewer name..."
+                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && reviewerName.trim()) handleAddReviewer(reviewerName);
+                      if (e.key === "Escape") { setAddingReviewer(false); setReviewerName(""); }
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => handleAddReviewer(reviewerName)}
+                    disabled={!reviewerName.trim()}
+                    className="px-3 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    Assign
+                  </button>
+                  <button
+                    onClick={() => { setAddingReviewer(false); setReviewerName(""); }}
+                    className="px-2 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>

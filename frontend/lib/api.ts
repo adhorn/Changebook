@@ -258,10 +258,10 @@ export const api = {
   listReviews: (changeId: string) =>
     request<Review[]>(`/changes/${changeId}/reviewers`),
 
-  assignReviewer: (changeId: string) =>
+  assignReviewer: (changeId: string, reviewerName?: string) =>
     request<Review>(`/changes/${changeId}/reviewers`, {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify(reviewerName ? { reviewer_name: reviewerName } : {}),
     }),
 
   submitDecision: (changeId: string, reviewId: string, decision: string, comment?: string) =>
