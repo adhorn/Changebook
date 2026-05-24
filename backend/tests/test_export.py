@@ -98,7 +98,7 @@ class TestMarkdownExport:
         change_id, _ = _create_full_change(client, sample_change_data)
 
         md = client.get(f"/api/v1/changes/{change_id}/export/markdown").text
-        assert "Adrian Hornsby" in md
+        assert "Test User" in md  # From auth headers
         assert "draft" in md.lower()
         assert "Increase max connections" in md
 

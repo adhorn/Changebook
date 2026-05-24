@@ -45,6 +45,24 @@ def client(db):
             pass
 
     app.dependency_overrides[get_db] = override_get_db
+    with TestClient(app, headers={
+        "X-User-Email": "test@changebook.dev",
+        "X-User-Name": "Test User",
+    }) as c:
+        yield c
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def unauthenticated_client(db):
+    """Client with no auth headers — for testing 401 responses."""
+    def override_get_db():
+        try:
+            yield db
+        finally:
+            pass
+
+    app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()

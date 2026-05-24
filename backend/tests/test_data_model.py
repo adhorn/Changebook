@@ -49,7 +49,7 @@ class TestChangeModel:
         assert data["customer_id"] == customer_id
         assert data["service_id"] == service_id
         assert data["environment_id"] == env_id
-        assert data["author_name"] == "Adrian Hornsby"
+        assert data["author_name"] == "Test User"  # From auth headers
         assert data["status"] == "draft"
         # No team_id in the response
         assert "team_id" not in data

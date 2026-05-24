@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import IntegrityError
 
+from app.api.auth import router as auth_router
 from app.api.changes import router as changes_router
 from app.api.organisations import router as organisations_router
 from app.api.preflight import router as preflight_router
@@ -36,6 +37,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth_router, prefix="/api/v1")
 app.include_router(changes_router, prefix="/api/v1")
 app.include_router(organisations_router, prefix="/api/v1")
 app.include_router(preflight_router, prefix="/api/v1")

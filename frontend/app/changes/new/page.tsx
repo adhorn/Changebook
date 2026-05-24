@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Customer, Environment, PreflightSection } from "@/lib/api";
+import UserSwitcher from "@/components/UserSwitcher";
 
 export default function NewChange() {
   const router = useRouter();
@@ -19,7 +20,6 @@ export default function NewChange() {
   const [customerId, setCustomerId] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [environmentId, setEnvironmentId] = useState("");
-  const [authorName, setAuthorName] = useState("");
   const [preflightAnswers, setPreflightAnswers] = useState<Record<string, string>>({});
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
@@ -48,7 +48,6 @@ export default function NewChange() {
         customer_id: customerId,
         service_id: serviceId,
         environment_id: environmentId,
-        author_name: authorName,
         preflight_answers: Object.keys(preflightAnswers).length > 0 ? preflightAnswers : undefined,
       });
       router.push(`/changes/${change.id}`);
@@ -62,16 +61,19 @@ export default function NewChange() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-400 hover:text-gray-600">
-              &larr;
-            </Link>
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">New Change</h1>
-              <p className="text-sm text-gray-500">
-                Think before you act — what, who, what-if, when
-              </p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Link href="/" className="text-gray-400 hover:text-gray-600">
+                &larr;
+              </Link>
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">New Change</h1>
+                <p className="text-sm text-gray-500">
+                  Think before you act — what, who, what-if, when
+                </p>
+              </div>
             </div>
+            <UserSwitcher />
           </div>
         </div>
       </header>
@@ -106,19 +108,7 @@ export default function NewChange() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Author *
-              </label>
-              <input
-                type="text"
-                required
-                value={authorName}
-                onChange={(e) => setAuthorName(e.target.value)}
-                placeholder="Your name"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-              />
-            </div>
+            {/* Author comes from auth — shown in the user switcher */}
           </div>
 
           {/* Customer / Service / Environment */}

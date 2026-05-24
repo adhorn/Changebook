@@ -14,7 +14,7 @@ class ChangeCreate(BaseModel):
     customer_id: uuid.UUID
     service_id: uuid.UUID
     environment_id: uuid.UUID
-    author_name: str
+    author_name: str | None = None  # Injected from auth headers
     preflight_answers: dict | None = None
     defence_tags: list[str] | None = None
     cloned_from: uuid.UUID | None = None
@@ -34,7 +34,7 @@ class ChangeCreate(BaseModel):
 
 
 class ChangeDuplicate(BaseModel):
-    author_name: str
+    author_name: str | None = None  # Injected from auth headers
     title: str | None = None
     customer_id: uuid.UUID | None = None
     service_id: uuid.UUID | None = None

@@ -1,9 +1,12 @@
+import { getAuthHeaders } from "./auth";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}/api/v1${path}`, {
     headers: {
       "Content-Type": "application/json",
+      ...getAuthHeaders(),
       ...options?.headers,
     },
     ...options,
@@ -18,7 +21,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 async function requestText(path: string): Promise<string> {
-  const res = await fetch(`${API_BASE}/api/v1${path}`);
+  const res = await fetch(`${API_BASE}/api/v1${path}`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
   if (!res.ok) {
     throw new Error(`API error: ${res.status}`);
   }
@@ -167,7 +174,6 @@ export const api = {
     customer_id: string;
     service_id: string;
     environment_id: string;
-    author_name: string;
     preflight_answers?: Record<string, string>;
     defence_tags?: string[];
   }) => request<Change>("/changes", { method: "POST", body: JSON.stringify(data) }),
@@ -175,10 +181,9 @@ export const api = {
   updateChange: (id: string, data: Record<string, unknown>) =>
     request<Change>(`/changes/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
 
-  transitionChange: (id: string, targetStatus: ChangeStatus, actorName: string, reason?: string) => {
+  transitionChange: (id: string, targetStatus: ChangeStatus, reason?: string) => {
     const params = new URLSearchParams({
       target_status: targetStatus,
-      actor_name: actorName,
     });
     if (reason) params.set("reason", reason);
     return request<Change>(
@@ -187,7 +192,7 @@ export const api = {
     );
   },
 
-  duplicateChange: (id: string, data: { author_name: string; title?: string; environment_id?: string }) =>
+  duplicateChange: (id: string, data: { title?: string; environment_id?: string }) =>
     request<Change>(`/changes/${id}/duplicate`, { method: "POST", body: JSON.stringify(data) }),
 
   exportMarkdown: (id: string) => requestText(`/changes/${id}/export/markdown`),
@@ -213,23 +218,25 @@ export const api = {
     }),
 
   deleteChecklistItem: (changeId: string, itemId: string) =>
-    fetch(`${API_BASE}/api/v1/changes/${changeId}/checklist/${itemId}`, { method: "DELETE" }),
+    fetch(`${API_BASE}/api/v1/changes/${changeId}/checklist/${itemId}`, {
+      method: "DELETE",
+      headers: { ...getAuthHeaders() },
+    }),
 
   // Execution
   completeItem: (changeId: string, itemId: string, data: {
     observed_result: string;
     status: string;
-    completed_by: string;
   }) =>
     request<ChecklistCompletion>(`/changes/${changeId}/checklist/${itemId}/complete`, {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
-  verifyHoldPoint: (changeId: string, itemId: string, verifiedBy: string) =>
+  verifyHoldPoint: (changeId: string, itemId: string) =>
     request<ChecklistCompletion>(`/changes/${changeId}/checklist/${itemId}/hold-point-verify`, {
       method: "POST",
-      body: JSON.stringify({ verified_by: verifiedBy }),
+      body: JSON.stringify({}),
     }),
 
   getExecutionStatus: (changeId: string) =>
@@ -239,10 +246,10 @@ export const api = {
   listReviews: (changeId: string) =>
     request<Review[]>(`/changes/${changeId}/reviewers`),
 
-  assignReviewer: (changeId: string, reviewerName: string) =>
+  assignReviewer: (changeId: string) =>
     request<Review>(`/changes/${changeId}/reviewers`, {
       method: "POST",
-      body: JSON.stringify({ reviewer_name: reviewerName }),
+      body: JSON.stringify({}),
     }),
 
   submitDecision: (changeId: string, reviewId: string, decision: string, comment?: string) =>

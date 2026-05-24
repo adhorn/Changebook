@@ -60,3 +60,22 @@ cd frontend && npm test
 - No print statements. Use Python logging / console.error.
 - No hardcoded secrets. Everything through environment variables.
 - Commit messages: imperative mood, one line, explain why not what.
+
+## Development workflow — mandatory for every issue
+
+Follow TDD. No exceptions. Every issue goes through this process:
+
+1. **Branch** — create a feature branch off main (`fix/issue-N-short-desc` or `feat/issue-N-short-desc`)
+2. **Test first** — write failing tests that define the expected behavior
+3. **Red** — run the tests, confirm they fail for the right reason
+4. **Implement** — write the minimum code to make the tests pass
+5. **Green** — run the tests, confirm they all pass. Paste the test output as evidence.
+6. **Screenshot** — open the app in Chrome and visually verify the fix. Take a screenshot as evidence.
+7. **PR** — push the branch and open a PR via `gh pr create`. Include test output and screenshot in the PR body.
+8. **Wait** — the PR must be reviewed and approved before merging. Never merge without approval.
+
+Rules:
+- Never commit directly to main for issue fixes.
+- Never close an issue without evidence (passing tests + screenshot).
+- Never assume a fix works — verify in the browser every time.
+- If a test cannot be written (pure visual issue), the screenshot IS the test. Explain why in the PR.

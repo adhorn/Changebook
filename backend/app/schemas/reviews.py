@@ -7,7 +7,7 @@ from app.models.review import ReviewDecision
 
 
 class ReviewerAssign(BaseModel):
-    reviewer_name: str
+    reviewer_name: str | None = None  # Injected from auth headers
 
 
 class ReviewDecisionSubmit(BaseModel):

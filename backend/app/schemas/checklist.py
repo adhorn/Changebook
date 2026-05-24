@@ -60,11 +60,11 @@ class ChecklistReorder(BaseModel):
 class ChecklistCompletionCreate(BaseModel):
     observed_result: str
     status: CompletionStatus
-    completed_by: str
+    completed_by: str | None = None  # Injected from auth headers
 
 
 class HoldPointVerify(BaseModel):
-    verified_by: str
+    verified_by: str | None = None  # Injected from auth headers
 
 
 class PhaseStatus(BaseModel):

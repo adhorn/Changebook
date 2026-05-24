@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Change, ChangeStatus } from "@/lib/api";
+import UserSwitcher from "@/components/UserSwitcher";
 
 const STATUS_COLORS: Record<ChangeStatus, string> = {
   draft: "bg-gray-100 text-gray-700",
@@ -83,12 +84,15 @@ export default function Home() {
                 Production changes — think, plan, execute, verify
               </p>
             </div>
-            <Link
-              href="/changes/new"
-              className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
-            >
-              New Change
-            </Link>
+            <div className="flex items-center gap-3">
+              <UserSwitcher />
+              <Link
+                href="/changes/new"
+                className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                New Change
+              </Link>
+            </div>
           </div>
         </div>
       </header>

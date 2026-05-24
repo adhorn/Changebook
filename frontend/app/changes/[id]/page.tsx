@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import UserSwitcher from "@/components/UserSwitcher";
 import {
   api,
   Change,
@@ -68,8 +69,7 @@ function ChecklistItemRow({
   const [showVerify, setShowVerify] = useState(false);
   const [observedResult, setObservedResult] = useState("");
   const [completionStatus, setCompletionStatus] = useState("completed");
-  const [completedBy, setCompletedBy] = useState("");
-  const [verifierName, setVerifierName] = useState("");
+  // Identity comes from auth headers — no manual name inputs needed
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,7 +83,6 @@ function ChecklistItemRow({
       await api.completeItem(changeId, item.id, {
         observed_result: observedResult,
         status: completionStatus,
-        completed_by: completedBy,
       });
       setShowComplete(false);
       onCompleted();
@@ -94,13 +93,11 @@ function ChecklistItemRow({
   }
 
   async function handleVerifyHoldPoint() {
-    if (!verifierName.trim()) return;
     setSubmitting(true);
     setError(null);
     try {
-      await api.verifyHoldPoint(changeId, item.id, verifierName.trim());
+      await api.verifyHoldPoint(changeId, item.id);
       setShowVerify(false);
-      setVerifierName("");
       onCompleted();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to verify hold point");
@@ -220,23 +217,12 @@ function ChecklistItemRow({
                 </button>
               ) : (
                 <div className="mt-2 flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={verifierName}
-                    onChange={(e) => setVerifierName(e.target.value)}
-                    placeholder="Verifier name..."
-                    className="px-2 py-1.5 border border-amber-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleVerifyHoldPoint();
-                    }}
-                    autoFocus
-                  />
                   <button
                     onClick={handleVerifyHoldPoint}
-                    disabled={!verifierName.trim() || submitting}
+                    disabled={submitting}
                     className="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
                   >
-                    {submitting ? "..." : "Verify"}
+                    {submitting ? "..." : "Confirm Verification"}
                   </button>
                   <button
                     onClick={() => setShowVerify(false)}
@@ -296,24 +282,13 @@ function ChecklistItemRow({
                         </option>
                       </select>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Your name *
-                      </label>
-                      <input
-                        type="text"
-                        value={completedBy}
-                        onChange={(e) => setCompletedBy(e.target.value)}
-                        placeholder="Name"
-                        className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs"
-                      />
-                    </div>
+                    {/* Identity comes from auth */}
                   </div>
                   {error && <p className="text-xs text-red-600">{error}</p>}
                   <div className="flex gap-2">
                     <button
                       onClick={handleComplete}
-                      disabled={submitting || !observedResult || !completedBy}
+                      disabled={submitting || !observedResult}
                       className="px-3 py-1.5 text-xs font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
                     >
                       {submitting ? "..." : "Record"}
@@ -454,13 +429,13 @@ export default function ChangeDetailPage() {
   const [transitioning, setTransitioning] = useState(false);
   const [showAbort, setShowAbort] = useState(false);
   const [abortReason, setAbortReason] = useState("");
-  const [newReviewer, setNewReviewer] = useState("");
+  // Reviewer identity comes from auth headers
   const [preflightExpanded, setPreflightExpanded] = useState(false);
   const [preflightEditing, setPreflightEditing] = useState(false);
   const [editedAnswers, setEditedAnswers] = useState<Record<string, string>>({});
   const [savingPreflight, setSavingPreflight] = useState(false);
   const [showDuplicate, setShowDuplicate] = useState(false);
-  const [dupAuthor, setDupAuthor] = useState("");
+  // Duplicate author comes from auth headers
   const [dupTitle, setDupTitle] = useState("");
   const [duplicating, setDuplicating] = useState(false);
 
@@ -510,7 +485,7 @@ export default function ChangeDetailPage() {
     setTransitioning(true);
     setError(null);
     try {
-      await api.transitionChange(change.id, target, change.author_name, reason);
+      await api.transitionChange(change.id, target, reason);
       setShowAbort(false);
       setAbortReason("");
       await loadAll();
@@ -521,10 +496,8 @@ export default function ChangeDetailPage() {
   }
 
   async function handleAddReviewer() {
-    if (!newReviewer.trim()) return;
     try {
-      await api.assignReviewer(id, newReviewer.trim());
-      setNewReviewer("");
+      await api.assignReviewer(id);
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add reviewer");
@@ -585,12 +558,10 @@ export default function ChangeDetailPage() {
   }
 
   async function handleDuplicate() {
-    if (!dupAuthor.trim()) return;
     setDuplicating(true);
     setError(null);
     try {
       const clone = await api.duplicateChange(id, {
-        author_name: dupAuthor.trim(),
         title: dupTitle.trim() || undefined,
       });
       router.push(`/changes/${clone.id}`);
@@ -743,7 +714,8 @@ export default function ChangeDetailPage() {
                 </div>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-3">
+              <UserSwitcher />
               <button
                 onClick={handleExport}
                 className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -852,27 +824,12 @@ export default function ChangeDetailPage() {
                   className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Author name *
-                </label>
-                <input
-                  type="text"
-                  value={dupAuthor}
-                  onChange={(e) => setDupAuthor(e.target.value)}
-                  placeholder="Your name"
-                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleDuplicate();
-                  }}
-                  autoFocus
-                />
-              </div>
+              {/* Author comes from auth */}
             </div>
             <div className="flex gap-2">
               <button
                 onClick={handleDuplicate}
-                disabled={!dupAuthor.trim() || duplicating}
+                disabled={duplicating}
                 className="px-4 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
               >
                 {duplicating ? "Duplicating..." : "Create Duplicate"}
@@ -1254,30 +1211,14 @@ export default function ChangeDetailPage() {
             </div>
           )}
 
-          {/* Add reviewer */}
+          {/* Assign yourself as reviewer */}
           {!isTerminal && (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newReviewer}
-                onChange={(e) => setNewReviewer(e.target.value)}
-                placeholder="Reviewer name..."
-                className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleAddReviewer();
-                  }
-                }}
-              />
-              <button
-                onClick={handleAddReviewer}
-                disabled={!newReviewer.trim()}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-              >
-                Add Reviewer
-              </button>
-            </div>
+            <button
+              onClick={handleAddReviewer}
+              className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Assign myself as reviewer
+            </button>
           )}
         </div>
       </main>

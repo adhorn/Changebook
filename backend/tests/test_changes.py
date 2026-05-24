@@ -28,7 +28,7 @@ def test_create_change(client, sample_change_data):
     data = response.json()
     assert data["title"] == "Update connection pool size on PROD-EU"
     assert data["status"] == "draft"
-    assert data["author_name"] == "Adrian Hornsby"
+    assert data["author_name"] == "Test User"  # From auth headers, not body
     assert data["customer_id"] == sample_change_data["customer_id"]
     assert data["service_id"] == sample_change_data["service_id"]
     assert data["environment_id"] == sample_change_data["environment_id"]

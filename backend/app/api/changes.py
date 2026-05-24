@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.core.auth import CurrentUser, get_current_user
 from app.core.database import get_db
 from app.models.audit import AuditEvent
 from app.models.change import ChangeStatus
@@ -37,8 +38,13 @@ router = APIRouter(prefix="/changes", tags=["changes"])
 
 
 @router.post("", response_model=ChangeDetailResponse, status_code=201)
-def create_change(payload: ChangeCreate, db: Session = Depends(get_db)):
+def create_change(
+    payload: ChangeCreate,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     data = payload.model_dump()
+    data["author_name"] = user.name  # Always from auth
     change = change_service.create_change(db, data)
     return change
 
@@ -114,6 +120,7 @@ def get_change(change_id: uuid.UUID, db: Session = Depends(get_db)):
 def duplicate_change(
     change_id: uuid.UUID,
     payload: ChangeDuplicate,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     source = change_service.get_change(db, change_id)
@@ -121,7 +128,7 @@ def duplicate_change(
         raise HTTPException(status_code=404, detail="Change not found")
 
     overrides = payload.model_dump(exclude={"author_name"}, exclude_unset=True)
-    clone = change_service.duplicate_change(db, source, overrides, payload.author_name)
+    clone = change_service.duplicate_change(db, source, overrides, payload.author_name or user.name)
     return clone
 
 
@@ -142,6 +149,7 @@ def export_markdown(
 def update_change(
     change_id: uuid.UUID,
     payload: ChangeUpdate,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
@@ -151,7 +159,7 @@ def update_change(
         raise HTTPException(status_code=422, detail="Can only update changes in draft status")
 
     data = payload.model_dump(exclude_unset=True)
-    change = change_service.update_change(db, change, data, change.author_name)
+    change = change_service.update_change(db, change, data, user.name)
     return change
 
 
@@ -159,8 +167,9 @@ def update_change(
 def transition_change(
     change_id: uuid.UUID,
     target_status: ChangeStatus,
-    actor_name: str,
+    actor_name: str | None = None,
     reason: str | None = None,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
@@ -168,7 +177,7 @@ def transition_change(
         raise HTTPException(status_code=404, detail="Change not found")
     try:
         change = change_service.transition_status(
-            db, change, target_status, actor_name, reason=reason,
+            db, change, target_status, actor_name or user.name, reason=reason,
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -186,6 +195,7 @@ def transition_change(
 def add_checklist_item(
     change_id: uuid.UUID,
     payload: ChecklistItemCreate,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
@@ -330,6 +340,7 @@ def complete_checklist_item(
     change_id: uuid.UUID,
     item_id: uuid.UUID,
     payload: ChecklistCompletionCreate,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
@@ -342,7 +353,7 @@ def complete_checklist_item(
 
     try:
         completion = execution_service.complete_item(
-            db, change, item, payload.observed_result, payload.status, payload.completed_by
+            db, change, item, payload.observed_result, payload.status, payload.completed_by or user.name
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -357,6 +368,7 @@ def verify_hold_point(
     change_id: uuid.UUID,
     item_id: uuid.UUID,
     payload: HoldPointVerify,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
@@ -369,7 +381,7 @@ def verify_hold_point(
 
     try:
         completion = execution_service.verify_hold_point(
-            db, change, item, payload.verified_by
+            db, change, item, payload.verified_by or user.name
         )
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
@@ -405,14 +417,24 @@ def get_execution_status(
 def assign_reviewer(
     change_id: uuid.UUID,
     payload: ReviewerAssign,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
 
+    reviewer_name = payload.reviewer_name or user.name
+
+    # Author cannot review their own change
+    if reviewer_name == change.author_name:
+        raise HTTPException(
+            status_code=422,
+            detail="Cannot review your own change. A different person must review.",
+        )
+
     try:
-        review = review_service.assign_reviewer(db, change_id, payload.reviewer_name)
+        review = review_service.assign_reviewer(db, change_id, reviewer_name)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return review
@@ -441,6 +463,7 @@ def submit_review_decision(
     change_id: uuid.UUID,
     review_id: uuid.UUID,
     payload: ReviewDecisionSubmit,
+    user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     change = change_service.get_change(db, change_id)
