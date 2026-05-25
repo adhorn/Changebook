@@ -46,11 +46,29 @@ python -m pytest tests/ -q
 ruff check .
 ruff format --check .
 
-# Frontend
+# Frontend build check
 cd frontend && npx next build
+
+# E2E tests (requires backend + frontend running)
+cd frontend && npx playwright test
 ```
 
 All tests must pass before submitting a PR. The CI pipeline runs the same checks.
+
+#### E2E tests
+
+The E2E tests use Playwright and run against the full stack (backend + frontend). If both are already running locally, Playwright reuses them. Otherwise it starts them automatically.
+
+```bash
+# First time: install browser
+cd frontend && npx playwright install chromium
+
+# Run all E2E tests
+npx playwright test
+
+# Run with visible browser
+npx playwright test --headed
+```
 
 ## Development workflow
 
