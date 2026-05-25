@@ -77,7 +77,7 @@ REALISTIC_PREFLIGHT_ANSWERS = {
         "Total degraded window during rollback: ~3 minutes."
     ),
     "blast_radius": (
-        "Limited to the Data Platform service for SimCorp. Portfolio Management and "
+        "Limited to the Data Platform service for Northwind Trading. Portfolio Management and "
         "Compliance modules run on separate infrastructure and are unaffected. The "
         "3 custom REST API integrations will experience brief reconnection during "
         "node restarts but will auto-recover."
@@ -96,7 +96,7 @@ REALISTIC_PREFLIGHT_ANSWERS = {
     ),
     "customer_aware": "Yes — discussed in the weekly ops sync on 2025-01-13.",
     "customer_agreed": (
-        "Yes — customer ops team (Maria Santos) approved the maintenance window "
+        "Yes — customer ops team (Alex Chen) approved the maintenance window "
         "and acknowledged the brief latency increase during rolling restarts."
     ),
     "maintenance_communicated": (
@@ -104,9 +104,9 @@ REALISTIC_PREFLIGHT_ANSWERS = {
         "2025-01-13. Customer acknowledged receipt. Follow-up reminder scheduled "
         "for 24h before execution."
     ),
-    "customer_contact": "Maria Santos (maria.santos@simcorp.com, +45 33 44 55 66).",
+    "customer_contact": "Alex Chen, Northwind Trading ops lead (alex.chen@example.com, +1 555-0142).",
     "completion_notification": (
-        "Email to Maria Santos and the SimCorp ops distribution list, plus an "
+        "Email to Alex Chen and the Northwind Trading ops distribution list, plus an "
         "update to INC-2025-0142 in ServiceNow. Include before/after metrics "
         "comparison from Grafana."
     ),
@@ -308,9 +308,9 @@ def _create_executing_change_realistic(client, sample_change_data):
     resp = client.post(
         "/api/v1/changes",
         json={
-            "title": "Migrate HikariCP connection pool to dynamic scaling (PROD-EU, SimCorp Data Platform)",
+            "title": "Migrate HikariCP connection pool to dynamic scaling (PROD-EU, Northwind Trading Data Platform)",
             "description": (
-                "The Data Platform service for SimCorp is experiencing intermittent "
+                "The Data Platform service for Northwind Trading is experiencing intermittent "
                 "connection timeout errors during peak hours (~15/hour) due to the "
                 "fixed connection pool size of 20. This change migrates to a dynamic "
                 "pool (10-50 connections) with shorter timeouts and validation queries. "
@@ -542,7 +542,7 @@ class TestRealisticContent:
 
         # Verify key content is present
         assert "HikariCP" in md
-        assert "SimCorp" in md or "Data Platform" in md
+        assert "Northwind Trading" in md or "Data Platform" in md
         assert "pre_flight" in md.lower() or "pre-flight" in md.lower()
         assert "execution" in md.lower()
         assert "verification" in md.lower()

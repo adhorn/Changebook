@@ -8,6 +8,13 @@ version = "0.1.0"
 description = "Production change tracking — from plan to verification"
 requires-python = ">=3.11"
 license = "Apache-2.0"
+authors = [
+    { name = "Adrian Hornsby", email = "adrian.hornsby@icloud.com" },
+]
+
+[project.urls]
+Repository = "https://github.com/adrianhornsby/changebook"
+
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
