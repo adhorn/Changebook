@@ -9,9 +9,10 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, PortableUUID, TimestampMixin, UUIDMixin
+from app.models.base import Base, TimestampMixin, UUIDMixin
 
 
 class ChecklistPhase(enum.StrEnum):
@@ -32,7 +33,7 @@ class ChecklistItem(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "checklist_items"
 
     change_id: Mapped[uuid.UUID] = mapped_column(
-        PortableUUID, ForeignKey("changes.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("changes.id"), nullable=False
     )
     phase: Mapped[ChecklistPhase] = mapped_column(Enum(ChecklistPhase), nullable=False)
     order: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -63,7 +64,7 @@ class ChecklistCompletion(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "checklist_completions"
 
     item_id: Mapped[uuid.UUID] = mapped_column(
-        PortableUUID, ForeignKey("checklist_items.id"), nullable=False, unique=True
+        UUID(as_uuid=True), ForeignKey("checklist_items.id"), nullable=False, unique=True
     )
 
     # The read-back — what the operator observed

@@ -89,14 +89,11 @@ def list_changes(
     if created_before:
         query = query.filter(Change.created_at <= created_before)
 
-    # Defence tag filtering requires JSON contains — handled at DB level
-    # For SQLite compatibility, we filter in Python for now
     if defence_tag:
-        all_changes = query.all()
-        filtered = [c for c in all_changes if c.defence_tags and defence_tag in c.defence_tags]
-        total = len(filtered)
-        changes = filtered[offset : offset + limit]
-        return changes, total
+        from sqlalchemy import cast
+        from sqlalchemy.dialects.postgresql import JSONB
+
+        query = query.filter(Change.defence_tags.op("@>")(cast([defence_tag], JSONB)))
 
     # Sorting
     if sort == "oldest":
@@ -252,9 +249,6 @@ def transition_status(
     # Staleness warning on transition to executing
     if new_status == ChangeStatus.EXECUTING and change.preflight_answered_at:
         answered_at = change.preflight_answered_at
-        # SQLite returns naive datetimes; ensure both are tz-aware for comparison
-        if answered_at.tzinfo is None:
-            answered_at = answered_at.replace(tzinfo=UTC)
         age = datetime.now(UTC) - answered_at
         if age > STALENESS_THRESHOLD:
             staleness_audit = AuditEvent(
