@@ -1,15 +1,18 @@
 import logging
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from app.api.auth import router as auth_router
 from app.api.changes import router as changes_router
 from app.api.organisations import router as organisations_router
 from app.api.preflight import router as preflight_router
 from app.core.config import settings
+from app.core.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -49,24 +52,13 @@ def create_tables():
     from app.core.database import engine
     from app.models.base import Base
 
-    try:
-        Base.metadata.create_all(bind=engine)
-    except Exception:
-        # In tests, the real DB may not be available — tables are created
-        # by the test fixtures using an in-memory SQLite engine instead.
-        logger.debug("Could not create tables on startup (expected in tests)")
+    Base.metadata.create_all(bind=engine)
 
 
 @app.get("/health")
-def health():
-    from sqlalchemy import text
-
-    from app.core.database import SessionLocal
-
+def health(db: Session = Depends(get_db)):
     try:
-        db = SessionLocal()
         db.execute(text("SELECT 1"))
-        db.close()
     except Exception:
         return JSONResponse(
             status_code=503,

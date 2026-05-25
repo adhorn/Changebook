@@ -1,9 +1,10 @@
 import uuid
 
 from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base, PortableJSON, PortableUUID, TimestampMixin, UUIDMixin
+from app.models.base import Base, TimestampMixin, UUIDMixin
 
 
 class AuditEvent(UUIDMixin, TimestampMixin, Base):
@@ -16,7 +17,7 @@ class AuditEvent(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "audit_events"
 
     change_id: Mapped[uuid.UUID] = mapped_column(
-        PortableUUID, ForeignKey("changes.id"), nullable=False
+        UUID(as_uuid=True), ForeignKey("changes.id"), nullable=False
     )
 
     # What happened
@@ -29,13 +30,13 @@ class AuditEvent(UUIDMixin, TimestampMixin, Base):
 
     # Which environment (if applicable)
     environment_id: Mapped[uuid.UUID | None] = mapped_column(
-        PortableUUID, ForeignKey("environments.id"), nullable=True
+        UUID(as_uuid=True), ForeignKey("environments.id"), nullable=True
     )
 
     # Human-readable description
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Structured data about the event (old/new status, step details, etc)
-    event_data: Mapped[dict | None] = mapped_column(PortableJSON, nullable=True)
+    event_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
 
     change: Mapped["Change"] = relationship(back_populates="audit_events")  # noqa: F821

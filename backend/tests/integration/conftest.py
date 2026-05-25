@@ -26,8 +26,8 @@ from app.models import Base
 POSTGRES_URL = os.environ.get("CHANGEBOOK_DATABASE_URL")
 
 pytestmark = pytest.mark.skipif(
-    not POSTGRES_URL or "sqlite" in (POSTGRES_URL or ""),
-    reason="Requires CHANGEBOOK_DATABASE_URL pointing to a real Postgres instance",
+    not POSTGRES_URL,
+    reason="Requires CHANGEBOOK_DATABASE_URL pointing to a Postgres instance",
 )
 
 

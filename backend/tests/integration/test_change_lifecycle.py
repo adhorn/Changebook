@@ -10,8 +10,7 @@ import os
 import pytest
 
 pytestmark = pytest.mark.skipif(
-    not os.environ.get("CHANGEBOOK_DATABASE_URL")
-    or "sqlite" in (os.environ.get("CHANGEBOOK_DATABASE_URL") or ""),
+    not os.environ.get("CHANGEBOOK_DATABASE_URL"),
     reason="Requires Postgres",
 )
 

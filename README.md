@@ -38,7 +38,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full details. The short version:
 docker compose up
 ```
 
-**Backend only (SQLite, no Docker):**
+**Backend only (requires Postgres — start one with `docker compose up db`):**
 
 ```bash
 cd backend
@@ -75,7 +75,7 @@ Copy `.env.example` to `backend/.env` and adjust as needed. Key variables:
 
 | Variable | Default | Description |
 |---|---|---|
-| `CHANGEBOOK_DATABASE_URL` | `sqlite:///./changebook_dev.db` | Database connection string |
+| `CHANGEBOOK_DATABASE_URL` | `postgresql://changebook:changebook@localhost:5432/changebook` | Database connection string |
 | `CHANGEBOOK_DEBUG` | `false` | Enable SQL logging |
 | `CHANGEBOOK_CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed CORS origins (JSON array) |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend URL for the frontend |
@@ -84,7 +84,7 @@ Copy `.env.example` to `backend/.env` and adjust as needed. Key variables:
 
 - **Backend**: Python, FastAPI, SQLAlchemy, Alembic
 - **Frontend**: TypeScript, Next.js (App Router), React, Tailwind CSS
-- **Database**: PostgreSQL (Docker) or SQLite (local dev)
+- **Database**: PostgreSQL
 - **Deployment**: Docker Compose
 
 ## Security

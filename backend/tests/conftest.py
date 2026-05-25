@@ -1,21 +1,21 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 from app.core.database import get_db
 from app.main import app
 from app.models import Base
 
-# In-memory SQLite for tests (fast, no Postgres dependency)
-SQLALCHEMY_TEST_URL = "sqlite://"
-
-engine = create_engine(
-    SQLALCHEMY_TEST_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool,
+# Use the configured database URL, or fall back to the default Postgres URL
+SQLALCHEMY_TEST_URL = os.environ.get(
+    "CHANGEBOOK_DATABASE_URL",
+    "postgresql://changebook:changebook@localhost:5432/changebook",
 )
+
+engine = create_engine(SQLALCHEMY_TEST_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

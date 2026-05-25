@@ -18,13 +18,12 @@ docker compose up
 
 Open http://localhost:3000. The backend runs on http://localhost:8000.
 
-**Backend only:**
+**Backend only (requires Postgres — start one with `docker compose up db`):**
 
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-# Uses SQLite by default for development
 uvicorn app.main:app --reload --port 8000
 ```
 
