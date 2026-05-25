@@ -63,6 +63,7 @@ export interface Change {
   service_name: string | null;
   environment_name: string | null;
   environment_platform: string | null;
+  pending_reviewers: string[];
 }
 
 export interface ChangeListResponse {

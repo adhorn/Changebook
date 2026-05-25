@@ -10,6 +10,7 @@ from app.core.database import get_db
 from app.models.audit import AuditEvent
 from app.models.change import ChangeStatus
 from app.models.checklist import ChecklistPhase
+from app.models.review import Review, ReviewDecision
 from app.schemas.changes import (
     ChangeCreate,
     ChangeDetailResponse,
@@ -69,6 +70,7 @@ def list_changes(
     title_search: str | None = None,
     created_after: str | None = None,
     created_before: str | None = None,
+    needs_review_by: str | None = None,
     sort: str | None = None,
     limit: int = Query(default=50, le=100),
     offset: int = Query(default=0, ge=0),
@@ -105,10 +107,40 @@ def list_changes(
     else:
         counts = {}
 
+    # Compute pending reviewers per change
+    pending_reviews_map: dict[uuid.UUID, list[str]] = {}
+    if change_ids:
+        pending_reviews = (
+            db.query(Review.change_id, Review.reviewer_name)
+            .filter(
+                Review.change_id.in_(change_ids),
+                Review.decision == ReviewDecision.PENDING,
+            )
+            .all()
+        )
+        for cid, reviewer_name in pending_reviews:
+            pending_reviews_map.setdefault(cid, []).append(reviewer_name)
+
+    # Filter by needs_review_by if requested
+    if needs_review_by:
+        # Get all change IDs where this user has a pending review
+        reviewer_change_ids = set(
+            row[0]
+            for row in db.query(Review.change_id)
+            .filter(
+                Review.reviewer_name == needs_review_by,
+                Review.decision == ReviewDecision.PENDING,
+            )
+            .all()
+        )
+        changes = [c for c in changes if c.id in reviewer_change_ids]
+        total = len(changes)
+
     data = []
     for c in changes:
         resp = ChangeResponse.model_validate(c)
         resp.audit_event_count = counts.get(c.id, 0)
+        resp.pending_reviewers = pending_reviews_map.get(c.id, [])
         data.append(resp)
 
     return ChangeListResponse(
@@ -122,7 +154,18 @@ def get_change(change_id: uuid.UUID, db: Session = Depends(get_db)):
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
-    return change
+    resp = ChangeDetailResponse.model_validate(change)
+    # Populate pending reviewers
+    pending = (
+        db.query(Review.reviewer_name)
+        .filter(
+            Review.change_id == change_id,
+            Review.decision == ReviewDecision.PENDING,
+        )
+        .all()
+    )
+    resp.pending_reviewers = [r[0] for r in pending]
+    return resp
 
 
 @router.post("/{change_id}/duplicate", response_model=ChangeDetailResponse, status_code=201)

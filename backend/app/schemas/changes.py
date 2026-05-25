@@ -90,6 +90,9 @@ class ChangeResponse(BaseModel):
     environment_name: str | None = None
     environment_platform: str | None = None
 
+    # Review indicator — names of reviewers with pending decisions
+    pending_reviewers: list[str] = []
+
 
 class ChangeDetailResponse(ChangeResponse):
     pass  # Will add checklist_items here in Feature 3

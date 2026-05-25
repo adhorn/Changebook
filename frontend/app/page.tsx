@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Change, ChangeStatus } from "@/lib/api";
+import { getCurrentUser } from "@/lib/auth";
 import UserSwitcher from "@/components/UserSwitcher";
 
 const STATUS_COLORS: Record<ChangeStatus, string> = {
@@ -51,6 +52,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [needsMyReview, setNeedsMyReview] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState("");
 
   function loadChanges(params?: Record<string, string>) {
     setLoading(true);
@@ -66,12 +69,21 @@ export default function Home() {
       });
   }
 
+  // Track current user (updates when user switcher changes)
+  useEffect(() => {
+    setCurrentUserName(getCurrentUser().name);
+    const onUserChanged = () => setCurrentUserName(getCurrentUser().name);
+    window.addEventListener("user-changed", onUserChanged);
+    return () => window.removeEventListener("user-changed", onUserChanged);
+  }, []);
+
   useEffect(() => {
     const params: Record<string, string> = {};
     if (statusFilter) params.status = statusFilter;
     if (searchQuery) params.title_search = searchQuery;
+    if (needsMyReview && currentUserName) params.needs_review_by = currentUserName;
     loadChanges(params);
-  }, [statusFilter, searchQuery]);
+  }, [statusFilter, searchQuery, needsMyReview, currentUserName]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -119,6 +131,20 @@ export default function Home() {
               </option>
             ))}
           </select>
+          <button
+            onClick={() => setNeedsMyReview(!needsMyReview)}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              needsMyReview
+                ? "bg-purple-100 text-purple-800 border border-purple-300"
+                : "bg-white text-gray-600 border border-gray-300 hover:bg-gray-50"
+            }`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            Needs my review
+          </button>
         </div>
 
         {loading && (
@@ -200,7 +226,18 @@ export default function Home() {
                       </Link>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={change.status} />
+                      <div className="flex items-center gap-2">
+                        <StatusBadge status={change.status} />
+                        {change.pending_reviewers?.includes(currentUserName) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                            Needs your review
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {change.author_name}
