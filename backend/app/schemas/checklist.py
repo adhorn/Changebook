@@ -64,7 +64,7 @@ class ChecklistCompletionCreate(BaseModel):
 
 
 class HoldPointVerify(BaseModel):
-    verified_by: str | None = None  # Injected from auth headers
+    verified_by: str  # Name of the person who verified (typed by operator)
 
 
 class PhaseStatus(BaseModel):

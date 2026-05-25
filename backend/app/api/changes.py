@@ -443,16 +443,16 @@ def verify_hold_point(
     if not item:
         raise HTTPException(status_code=404, detail="Checklist item not found")
 
-    # Two-person rule: verifier must be different from completer
-    if item.completion and item.completion.completed_by == user.name:
+    # Two-person rule: verifier name must be different from completer
+    if item.completion and item.completion.completed_by == payload.verified_by:
         raise HTTPException(
             status_code=422,
-            detail="Hold point must be verified by a different person "
-            "than the one who completed the item.",
+            detail=f"Hold point must be verified by a different person "
+            f"than the one who completed the item ({item.completion.completed_by}).",
         )
 
     try:
-        completion = execution_service.verify_hold_point(db, change, item, user.name)
+        completion = execution_service.verify_hold_point(db, change, item, payload.verified_by)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     return completion

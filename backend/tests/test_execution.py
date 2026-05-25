@@ -322,11 +322,10 @@ class TestHoldPoints:
             },
         )
 
-        # Verify the hold point
+        # Verify the hold point — operator types the verifier's name
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
-            json={},
-            headers=JANE,
+            json={"verified_by": "Jane Smith"},
         )
         assert resp.status_code == 200
         assert resp.json()["hold_point_verified_by"] == "Jane Smith"
@@ -362,11 +361,10 @@ class TestHoldPoints:
             },
         )
 
-        # Verify hold point
+        # Verify hold point — operator types the verifier's name
         client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
-            json={},
-            headers=JANE,
+            json={"verified_by": "Jane Smith"},
         )
 
         # Now next item should unlock
@@ -394,8 +392,7 @@ class TestHoldPoints:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/hold-point-verify",
-            json={},
-            headers=JANE,
+            json={"verified_by": "Jane Smith"},
         )
         assert resp.status_code == 422
         assert "hold" in resp.json()["detail"].lower()
@@ -413,8 +410,65 @@ class TestHoldPoints:
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
+            json={"verified_by": "Jane Smith"},
+        )
+        assert resp.status_code == 422
+
+    def test_cannot_verify_with_same_name_as_completer(self, client, sample_change_data):
+        """The verifier name cannot match the completer — two-person rule."""
+        items_def = {
+            "pre_flight": [{"description": "Pre-flight check"}],
+            "execution": [
+                {"description": "Apply config", "is_hold_point": True},
+                {"description": "Restart service"},
+            ],
+            "verification": [{"description": "Check health"}],
+        }
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
+
+        # Complete pre-flight
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
+            json={"observed_result": "OK", "status": "completed"},
+        )
+
+        # Complete the hold-point item (completer is "Test User" from conftest)
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
+            json={"observed_result": "Config applied", "status": "completed"},
+        )
+
+        # Try to verify with the same name as the completer
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
+            json={"verified_by": "Test User"},
+        )
+        assert resp.status_code == 422
+        assert "different person" in resp.json()["detail"].lower()
+
+    def test_verified_by_is_required(self, client, sample_change_data):
+        """The verified_by field is required — cannot send empty body."""
+        items_def = {
+            "pre_flight": [{"description": "Pre-flight check"}],
+            "execution": [
+                {"description": "Apply config", "is_hold_point": True},
+            ],
+            "verification": [{"description": "Check health"}],
+        }
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
+
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
+            json={"observed_result": "OK", "status": "completed"},
+        )
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
+            json={"observed_result": "Config applied", "status": "completed"},
+        )
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
             json={},
-            headers=JANE,
         )
         assert resp.status_code == 422
 
@@ -635,11 +689,10 @@ class TestExecutionAudit:
             },
         )
 
-        # Verify
+        # Verify — operator types the verifier's name
         client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/hold-point-verify",
-            json={},
-            headers=JANE,
+            json={"verified_by": "Jane Smith"},
         )
 
         from app.models.audit import AuditEvent
