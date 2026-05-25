@@ -4,18 +4,44 @@ const API = "http://localhost:8000/api/v1";
 
 const ALICE_HEADERS = { "X-User-Email": "alice@changebook.dev", "X-User-Name": "Alice Engineer" };
 
+async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
+  const res = await fetch(`${API}${path}`, {
+    headers: { ...ALICE_HEADERS, "Content-Type": "application/json" },
+    ...options,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`API ${options?.method || "GET"} ${path} returned ${res.status}: ${text}`);
+  }
+  return res;
+}
+
+/** Wait for the backend to be ready (health check). */
+async function waitForBackend(maxWait = 15_000) {
+  const deadline = Date.now() + maxWait;
+  while (Date.now() < deadline) {
+    try {
+      const res = await fetch("http://localhost:8000/health");
+      if (res.ok) return;
+    } catch {
+      // not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error("Backend did not become ready");
+}
+
 /** Create a customer with a service via API, return their IDs. Idempotent. */
 export async function ensureCustomer(): Promise<{ customerId: string; serviceId: string }> {
-  const res = await fetch(`${API}/customers`, {
-    headers: { ...ALICE_HEADERS, "Content-Type": "application/json" },
-  });
+  await waitForBackend();
+
+  const res = await apiFetch("/customers");
   const customers = await res.json();
   if (customers.length > 0 && customers[0].services.length > 0) {
     return { customerId: customers[0].id, serviceId: customers[0].services[0].id };
   }
-  const createRes = await fetch(`${API}/customers`, {
+  const createRes = await apiFetch("/customers", {
     method: "POST",
-    headers: { ...ALICE_HEADERS, "Content-Type": "application/json" },
     body: JSON.stringify({ name: "Acme Corp", services: [{ name: "Platform" }] }),
   });
   const cust = await createRes.json();
@@ -24,14 +50,13 @@ export async function ensureCustomer(): Promise<{ customerId: string; serviceId:
 
 /** Create an environment via API, return its ID. Idempotent. */
 export async function ensureEnvironment(): Promise<string> {
-  const res = await fetch(`${API}/environments`, {
-    headers: { ...ALICE_HEADERS, "Content-Type": "application/json" },
-  });
+  await waitForBackend();
+
+  const res = await apiFetch("/environments");
   const envs = await res.json();
   if (envs.length > 0) return envs[0].id;
-  const createRes = await fetch(`${API}/environments`, {
+  const createRes = await apiFetch("/environments", {
     method: "POST",
-    headers: { ...ALICE_HEADERS, "Content-Type": "application/json" },
     body: JSON.stringify({ name: "PROD-EU", platform: "AWS" }),
   });
   const env = await createRes.json();
@@ -43,7 +68,6 @@ export async function ensureEnvironment(): Promise<string> {
  * Navigates to the base URL first if needed (localStorage requires same-origin).
  */
 export async function switchUser(page: Page, user: { email: string; name: string; role: string }) {
-  // Ensure we're on the app origin so localStorage is accessible
   if (page.url() === "about:blank") {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
