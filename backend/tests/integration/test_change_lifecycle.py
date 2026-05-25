@@ -36,7 +36,7 @@ COMPLETE_PREFLIGHT = {
     "customer_aware": "Yes — communicated via change advisory board",
     "customer_agreed": "Yes — approved in CAB meeting",
     "maintenance_communicated": "Yes — email sent to operations team",
-    "customer_contact": "ops@simcorp.com",
+    "customer_contact": "ops@example.com",
     "completion_notification": "Email to ops team + Slack #changes channel",
 }
 

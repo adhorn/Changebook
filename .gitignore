@@ -38,6 +38,13 @@ docker-compose.override.yml
 
 # Database
 *.sql.bak
+*.db
+
+# Claude Code
+.claude/
+
+# Ruff
+.ruff_cache/
 
 # Test
 .coverage

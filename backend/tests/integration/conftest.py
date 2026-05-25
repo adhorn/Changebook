@@ -89,7 +89,7 @@ def customer_and_service(client):
     resp = client.post(
         "/api/v1/customers",
         json={
-            "name": "SimCorp A/S",
+            "name": "Northwind Trading",
             "services": [{"name": "Data Platform"}],
         },
     )
