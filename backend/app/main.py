@@ -59,4 +59,17 @@ def create_tables():
 
 @app.get("/health")
 def health():
+    from sqlalchemy import text
+
+    from app.core.database import SessionLocal
+
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db.close()
+    except Exception:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unavailable", "detail": "database not ready"},
+        )
     return {"status": "ok"}

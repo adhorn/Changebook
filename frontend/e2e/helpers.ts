@@ -16,25 +16,8 @@ async function apiFetch(path: string, options?: RequestInit): Promise<Response> 
   return res;
 }
 
-/** Wait for the backend to be ready (health check). */
-async function waitForBackend(maxWait = 15_000) {
-  const deadline = Date.now() + maxWait;
-  while (Date.now() < deadline) {
-    try {
-      const res = await fetch("http://localhost:8000/health");
-      if (res.ok) return;
-    } catch {
-      // not ready yet
-    }
-    await new Promise((r) => setTimeout(r, 500));
-  }
-  throw new Error("Backend did not become ready");
-}
-
 /** Create a customer with a service via API, return their IDs. Idempotent. */
 export async function ensureCustomer(): Promise<{ customerId: string; serviceId: string }> {
-  await waitForBackend();
-
   const res = await apiFetch("/customers");
   const customers = await res.json();
   if (customers.length > 0 && customers[0].services.length > 0) {
@@ -50,8 +33,6 @@ export async function ensureCustomer(): Promise<{ customerId: string; serviceId:
 
 /** Create an environment via API, return its ID. Idempotent. */
 export async function ensureEnvironment(): Promise<string> {
-  await waitForBackend();
-
   const res = await apiFetch("/environments");
   const envs = await res.json();
   if (envs.length > 0) return envs[0].id;
