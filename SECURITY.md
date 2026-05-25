@@ -2,7 +2,7 @@
 
 ## Reporting vulnerabilities
 
-If you discover a security vulnerability, please report it privately via email to **adrian.hornsby@icloud.com**. Do not open a public GitHub issue.
+If you discover a security vulnerability, please report it privately via email to **adhorn@resiliumlabs.com**. Do not open a public GitHub issue.
 
 Include:
 - Description of the vulnerability

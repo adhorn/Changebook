@@ -9,7 +9,7 @@ description = "Production change tracking — from plan to verification"
 requires-python = ">=3.11"
 license = "Apache-2.0"
 authors = [
-    { name = "Adrian Hornsby", email = "adrian.hornsby@icloud.com" },
+    { name = "Adrian Hornsby", email = "adhorn@resiliumlabs.com" },
 ]
 
 [project.urls]

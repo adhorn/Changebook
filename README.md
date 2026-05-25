@@ -16,9 +16,9 @@ Everything is audited. The full change — who proposed it, who reviewed it, wha
 
 ## Why
 
-ITSM tools track approval. Runbook tools track execution. Nothing tracks the full lifecycle in one place with the discipline of a pilot's checklist.
+Most production changes should flow through a pipeline. But some can't — infrastructure migrations, manual database operations, one-off platform changes. These still happen, and they still need discipline.
 
-When an incident happens and the question is "what changed?", the answer should be in the tool — not in someone's memory or a chat message.
+Changebook tracks those changes. It's not a runbook tool or a CI/CD replacement. It's a structured record for planned changes that require human judgement, built on the same cognitive systems science that underpins checklists in aviation and other safety-critical environments.
 
 ## Quick start
 
