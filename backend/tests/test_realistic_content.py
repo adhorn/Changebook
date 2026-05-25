@@ -490,8 +490,7 @@ class TestRealisticContent:
                 prev_id = all_items[i - 1]["id"]
                 client.post(
                     f"/api/v1/changes/{change_id}/checklist/{prev_id}/hold-point-verify",
-                    json={},
-                    headers=SENIOR,
+                    json={"verified_by": "Senior Engineer"},
                 )
 
             resp = client.post(
@@ -516,8 +515,7 @@ class TestRealisticContent:
         last_hold = [i for i in all_items if i["id"] in hold_point_ids][-1]
         client.post(
             f"/api/v1/changes/{change_id}/checklist/{last_hold['id']}/hold-point-verify",
-            json={},
-            headers=SENIOR,
+            json={"verified_by": "Senior Engineer"},
         )
 
         # Check execution status — all done

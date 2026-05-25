@@ -247,10 +247,10 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  verifyHoldPoint: (changeId: string, itemId: string) =>
+  verifyHoldPoint: (changeId: string, itemId: string, verifiedBy: string) =>
     request<ChecklistCompletion>(`/changes/${changeId}/checklist/${itemId}/hold-point-verify`, {
       method: "POST",
-      body: JSON.stringify({}),
+      body: JSON.stringify({ verified_by: verifiedBy }),
     }),
 
   getExecutionStatus: (changeId: string) =>

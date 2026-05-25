@@ -105,6 +105,7 @@ function ChecklistItemRow({
   isExecuting,
   isDraft,
   changeId,
+  currentUserName,
   onCompleted,
 }: {
   item: ChecklistItem;
@@ -112,13 +113,14 @@ function ChecklistItemRow({
   isExecuting: boolean;
   isDraft: boolean;
   changeId: string;
+  currentUserName: string;
   onCompleted: () => void;
 }) {
   const [showComplete, setShowComplete] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
+  const [verifierName, setVerifierName] = useState("");
   const [observedResult, setObservedResult] = useState("");
   const [completionStatus, setCompletionStatus] = useState("completed");
-  // Identity comes from auth headers — no manual name inputs needed
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -189,11 +191,20 @@ function ChecklistItemRow({
   }
 
   async function handleVerifyHoldPoint() {
+    if (!verifierName.trim()) {
+      setError("Enter the name of the person who verified this step.");
+      return;
+    }
+    if (verifierName.trim() === completion?.completed_by) {
+      setError(`Must be a different person than ${completion.completed_by}.`);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
-      await api.verifyHoldPoint(changeId, item.id);
+      await api.verifyHoldPoint(changeId, item.id, verifierName.trim());
       setShowVerify(false);
+      setVerifierName("");
       onCompleted();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to verify hold point");
@@ -407,27 +418,46 @@ function ChecklistItemRow({
           {needsHoldVerification && isExecuting && (
             <>
               {!showVerify ? (
-                <button
-                  onClick={() => setShowVerify(true)}
-                  className="mt-2 px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100"
-                >
-                  Verify Hold Point
-                </button>
+                <div className="mt-2">
+                  <p className="text-xs text-amber-700 mb-1">
+                    A second person must verify this hold point before proceeding.
+                  </p>
+                  <button
+                    onClick={() => { setShowVerify(true); setError(null); }}
+                    className="px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100"
+                  >
+                    Verify Hold Point
+                  </button>
+                </div>
               ) : (
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    onClick={handleVerifyHoldPoint}
-                    disabled={submitting}
-                    className="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
-                  >
-                    {submitting ? "..." : "Confirm Verification"}
-                  </button>
-                  <button
-                    onClick={() => setShowVerify(false)}
-                    className="px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
-                  >
-                    Cancel
-                  </button>
+                <div className="mt-2 p-3 bg-amber-50/50 border border-amber-200 rounded-lg space-y-2">
+                  <label className="block text-xs font-medium text-amber-900">
+                    Who verified this step?
+                  </label>
+                  <input
+                    type="text"
+                    value={verifierName}
+                    onChange={(e) => { setVerifierName(e.target.value); setError(null); }}
+                    placeholder="Name of the person who checked this"
+                    className="w-full px-2 py-1.5 border border-amber-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    autoFocus
+                  />
+                  {error && <p className="text-xs text-red-600">{error}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleVerifyHoldPoint}
+                      disabled={submitting || !verifierName.trim()}
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-amber-600 rounded hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {submitting ? "..." : "Confirm"}
+                    </button>
+                    <button
+                      onClick={() => { setShowVerify(false); setVerifierName(""); setError(null); }}
+                      className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               )}
             </>
@@ -1448,6 +1478,7 @@ export default function ChangeDetailPage() {
                         isExecuting={isExecuting}
                         isDraft={canEdit}
                         changeId={id}
+                        currentUserName={currentUserName}
                         onCompleted={loadAll}
                       />
                     ))}
