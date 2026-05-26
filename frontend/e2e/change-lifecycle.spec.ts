@@ -127,8 +127,7 @@ test.describe.serial("Change lifecycle", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: "+ Assign reviewer" }).click();
-    await page.getByPlaceholder("Reviewer name...").fill("Bob Reviewer");
-    await page.getByRole("button", { name: "Assign" }).click();
+    await page.locator("select").last().selectOption("Bob Reviewer");
     await page.waitForTimeout(500);
     await expect(page.getByText("Bob Reviewer")).toBeVisible();
     await expect(page.getByText("pending")).toBeVisible();

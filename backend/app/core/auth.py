@@ -15,6 +15,14 @@ class CurrentUser:
     name: str
 
 
+MOCK_USERS = [
+    CurrentUser(email="alice@changebook.dev", name="Alice Engineer"),
+    CurrentUser(email="bob@changebook.dev", name="Bob Reviewer"),
+    CurrentUser(email="carol@changebook.dev", name="Carol Operator"),
+    CurrentUser(email="dave@changebook.dev", name="Dave Manager"),
+]
+
+
 def get_current_user(request: Request) -> CurrentUser:
     """FastAPI dependency — extract identity from request headers."""
     email = request.headers.get("X-User-Email")

@@ -1,16 +1,13 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import union_all
 from sqlalchemy.orm import Session
 
+from app.core.auth import MOCK_USERS
 from app.core.database import get_db
 from app.core.tenant import get_default_org_id
-from app.models.change import Change
-from app.models.checklist import ChecklistCompletion
 from app.models.customer import Customer, Service
 from app.models.environment import Environment
-from app.models.review import Review
 from app.models.team import Team
 from app.schemas.customers import (
     CustomerCreate,
@@ -143,16 +140,10 @@ def list_environments(db: Session = Depends(get_db)):
     return db.query(Environment).all()
 
 
-# --- People (known names from activity) ---
+# --- People (known users) ---
 
 
 @router.get("/people", response_model=list[str])
-def list_people(db: Session = Depends(get_db)):
-    """Return distinct names seen across changes, reviews, and completions."""
-    names_query = union_all(
-        db.query(Change.author_name).distinct(),
-        db.query(Review.reviewer_name).distinct(),
-        db.query(ChecklistCompletion.completed_by).distinct(),
-    ).subquery()
-    rows = db.query(names_query.c[0]).distinct().order_by(names_query.c[0]).all()
-    return [row[0] for row in rows]
+def list_people():
+    """Return all known users in the system."""
+    return sorted(u.name for u in MOCK_USERS)

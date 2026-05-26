@@ -748,10 +748,8 @@ export default function ChangeDetailPage() {
     setTransitioning(false);
   }
 
-  const [reviewerName, setReviewerName] = useState("");
   const [addingReviewer, setAddingReviewer] = useState(false);
   const [knownPeople, setKnownPeople] = useState<string[]>([]);
-  const [showPeopleSuggestions, setShowPeopleSuggestions] = useState(false);
 
   async function openReviewerInput() {
     setAddingReviewer(true);
@@ -759,16 +757,14 @@ export default function ChangeDetailPage() {
       const people = await api.listPeople();
       setKnownPeople(people);
     } catch {
-      // non-critical — just means no suggestions
+      // non-critical
     }
   }
 
-  async function handleAddReviewer(name?: string) {
+  async function handleAddReviewer(name: string) {
     try {
-      await api.assignReviewer(id, name?.trim() || undefined);
-      setReviewerName("");
+      await api.assignReviewer(id, name);
       setAddingReviewer(false);
-      setShowPeopleSuggestions(false);
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add reviewer");
@@ -1607,7 +1603,7 @@ export default function ChangeDetailPage() {
         </div>
 
         {/* Reviews */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4 overflow-visible">
+        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
           <h2 className="text-lg font-medium text-gray-900">Reviews</h2>
 
           {reviews.length === 0 ? (
@@ -1644,63 +1640,32 @@ export default function ChangeDetailPage() {
                   + Assign reviewer
                 </button>
               ) : (
-                <div className="relative">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={reviewerName}
-                      onChange={(e) => {
-                        setReviewerName(e.target.value);
-                        setShowPeopleSuggestions(true);
-                      }}
-                      onFocus={() => setShowPeopleSuggestions(true)}
-                      placeholder="Reviewer name..."
-                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && reviewerName.trim()) handleAddReviewer(reviewerName);
-                        if (e.key === "Escape") { setAddingReviewer(false); setReviewerName(""); setShowPeopleSuggestions(false); }
-                      }}
-                      autoFocus
-                    />
-                    <button
-                      onClick={() => handleAddReviewer(reviewerName)}
-                      disabled={!reviewerName.trim()}
-                      className="px-3 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
-                    >
-                      Assign
-                    </button>
-                    <button
-                      onClick={() => { setAddingReviewer(false); setReviewerName(""); setShowPeopleSuggestions(false); }}
-                      className="px-2 py-1.5 text-sm text-gray-500 hover:text-gray-700"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  {/* People suggestions dropdown */}
-                  {showPeopleSuggestions && (() => {
-                    const assigned = reviews.map((r) => r.reviewer_name);
-                    const filtered = knownPeople.filter((p) => {
-                      if (assigned.includes(p)) return false;
-                      if (change && p === change.author_name) return false;
-                      if (reviewerName && !p.toLowerCase().includes(reviewerName.toLowerCase())) return false;
-                      return true;
-                    });
-                    if (filtered.length === 0) return null;
-                    return (
-                      <div className="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                        {filtered.map((person) => (
-                          <button
-                            key={person}
-                            type="button"
-                            onClick={() => handleAddReviewer(person)}
-                            className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50"
-                          >
-                            {person}
-                          </button>
-                        ))}
-                      </div>
-                    );
-                  })()}
+                <div className="flex items-center gap-2">
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      if (e.target.value) handleAddReviewer(e.target.value);
+                    }}
+                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+                    autoFocus
+                  >
+                    <option value="" disabled>Select reviewer...</option>
+                    {knownPeople
+                      .filter((p) => {
+                        if (reviews.some((r) => r.reviewer_name === p)) return false;
+                        if (p === change.author_name) return false;
+                        return true;
+                      })
+                      .map((person) => (
+                        <option key={person} value={person}>{person}</option>
+                      ))}
+                  </select>
+                  <button
+                    onClick={() => setAddingReviewer(false)}
+                    className="px-2 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+                  >
+                    Cancel
+                  </button>
                 </div>
               )}
             </>
