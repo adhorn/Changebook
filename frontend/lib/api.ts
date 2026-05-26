@@ -14,7 +14,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail || `API error: ${res.status}`);
+    let message: string;
+    if (typeof error.detail === "string") {
+      message = error.detail;
+    } else if (Array.isArray(error.detail)) {
+      // FastAPI validation errors: [{loc: [...], msg: "..."}, ...]
+      message = error.detail
+        .map((e: { loc?: string[]; msg?: string }) => {
+          const field = e.loc?.slice(-1)[0] || "unknown";
+          return `${field}: ${e.msg}`;
+        })
+        .join("; ");
+    } else {
+      message = `API error: ${res.status}`;
+    }
+    throw new Error(message);
   }
 
   return res.json();

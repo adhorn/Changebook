@@ -63,9 +63,19 @@ export default function NewChange() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
 
+    const missing: string[] = [];
+    if (!title.trim()) missing.push("Title");
+    if (!customerId) missing.push("Customer");
+    if (!serviceId) missing.push("Service");
+    if (!environmentId) missing.push("Environment");
+    if (missing.length > 0) {
+      setError(`Required: ${missing.join(", ")}`);
+      return;
+    }
+
+    setSubmitting(true);
     try {
       const change = await api.createChange({
         title,

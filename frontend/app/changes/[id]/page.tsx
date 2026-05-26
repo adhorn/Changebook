@@ -817,8 +817,17 @@ export default function ChangeDetailPage() {
   }
 
   async function handleSaveDetails() {
-    setSavingDetails(true);
     setError(null);
+    const missing: string[] = [];
+    if (!editTitle.trim()) missing.push("Title");
+    if (!editCustomerId) missing.push("Customer");
+    if (!editServiceId) missing.push("Service");
+    if (!editEnvironmentId) missing.push("Environment");
+    if (missing.length > 0) {
+      setError(`Required: ${missing.join(", ")}`);
+      return;
+    }
+    setSavingDetails(true);
     try {
       await api.updateChange(id, {
         title: editTitle,
