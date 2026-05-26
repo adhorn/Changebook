@@ -11,6 +11,7 @@ from app.api.auth import router as auth_router
 from app.api.changes import router as changes_router
 from app.api.organisations import router as organisations_router
 from app.api.preflight import router as preflight_router
+from app.api.templates import router as templates_router
 from app.core.config import settings
 from app.core.database import get_db
 
@@ -44,6 +45,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(changes_router, prefix="/api/v1")
 app.include_router(organisations_router, prefix="/api/v1")
 app.include_router(preflight_router, prefix="/api/v1")
+app.include_router(templates_router, prefix="/api/v1")
 
 
 @app.on_event("startup")

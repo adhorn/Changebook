@@ -355,12 +355,12 @@ function ChecklistItemRow({
               <CopyButton text={item.command} />
             </div>
           )}
-          {item.expected_outcome && (
+          {item.expected_outcome && !showComplete && (
             <p className="mt-1 text-xs text-gray-500">
               Expected: {item.expected_outcome}
             </p>
           )}
-          {item.rollback_action && (
+          {item.rollback_action && !showComplete && (
             <p className="mt-1 text-xs text-gray-500">
               Rollback: {item.rollback_action}
             </p>
@@ -476,9 +476,30 @@ function ChecklistItemRow({
                 </button>
               ) : (
                 <div className="mt-3 space-y-2 p-3 bg-white border border-blue-200 rounded-lg">
+                  {/* Surface expected outcome prominently when recording */}
+                  {item.expected_outcome && (
+                    <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-md">
+                      <p className="text-xs font-medium text-blue-800 mb-0.5">
+                        What you should see
+                      </p>
+                      <p className="text-sm text-blue-900 whitespace-pre-wrap">
+                        {item.expected_outcome}
+                      </p>
+                    </div>
+                  )}
+                  {item.rollback_action && (
+                    <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-md">
+                      <p className="text-xs font-medium text-gray-500 mb-0.5">
+                        If this doesn&apos;t look right
+                      </p>
+                      <p className="text-xs text-gray-700 whitespace-pre-wrap">
+                        {item.rollback_action}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Result — paste output or describe what you observed *
+                      What did you observe? *
                     </label>
                     <textarea
                       value={observedResult}
@@ -960,6 +981,28 @@ export default function ChangeDetailPage() {
     }
   }
 
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateTitle, setTemplateTitle] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
+  async function handleSaveAsTemplate() {
+    setSavingTemplate(true);
+    setError(null);
+    try {
+      await api.saveAsTemplate(id, {
+        title: templateTitle.trim() || undefined,
+      });
+      setShowSaveTemplate(false);
+      setTemplateTitle("");
+      // Brief success feedback
+      setError(null);
+      alert("Template saved to the library.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save template");
+    }
+    setSavingTemplate(false);
+  }
+
   async function handleExport() {
     setError(null);
     try {
@@ -1159,6 +1202,15 @@ export default function ChangeDetailPage() {
               >
                 Duplicate
               </button>
+              <button
+                onClick={() => {
+                  setTemplateTitle(`${change.title}`);
+                  setShowSaveTemplate(true);
+                }}
+                className="px-3 py-1.5 text-xs font-medium text-indigo-600 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-50"
+              >
+                Save as Template
+              </button>
               {!isTerminal && isAuthor && (
                 <button
                   onClick={() => setShowAbort(!showAbort)}
@@ -1337,6 +1389,47 @@ export default function ChangeDetailPage() {
               </button>
               <button
                 onClick={() => setShowDuplicate(false)}
+                className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Save as template form */}
+        {showSaveTemplate && (
+          <div className="bg-white rounded-lg border border-indigo-200 p-6 space-y-3">
+            <h2 className="text-sm font-medium text-gray-900">
+              Save as Template
+            </h2>
+            <p className="text-xs text-gray-500">
+              Saves the checklist, defence tags, and change profile answers to the template library.
+              Customer, service, environment, and maintenance window are not included.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Template name
+              </label>
+              <input
+                type="text"
+                value={templateTitle}
+                onChange={(e) => setTemplateTitle(e.target.value)}
+                placeholder={`${change.title} (template)`}
+                className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveAsTemplate}
+                disabled={savingTemplate}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {savingTemplate ? "Saving..." : "Save Template"}
+              </button>
+              <button
+                onClick={() => setShowSaveTemplate(false)}
                 className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
               >
                 Cancel

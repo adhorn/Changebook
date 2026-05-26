@@ -176,6 +176,43 @@ export interface Environment {
   customer_id: string | null;
 }
 
+export interface Template {
+  id: string;
+  title: string;
+  description: string | null;
+  defence_tags: string[] | null;
+  preflight_answers: Record<string, string> | null;
+  source_change_id: string | null;
+  author_name: string;
+  item_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateChecklistItemCreate {
+  phase: string;
+  description: string;
+  command?: string;
+  expected_outcome?: string;
+  rollback_action?: string;
+  is_hold_point?: boolean;
+}
+
+export interface TemplateChecklistItem {
+  id: string;
+  phase: string;
+  order: number;
+  description: string;
+  command: string | null;
+  expected_outcome: string | null;
+  rollback_action: string | null;
+  is_hold_point: boolean;
+}
+
+export interface TemplateDetail extends Template {
+  items: TemplateChecklistItem[];
+}
+
 // --- API calls ---
 
 export const api = {
@@ -308,4 +345,37 @@ export const api = {
 
   // People (known names from activity)
   listPeople: () => request<string[]>("/people"),
+
+  // Templates
+  listTemplates: (params?: Record<string, string>) => {
+    const query = new URLSearchParams(params);
+    const qs = query.toString();
+    return request<Template[]>(`/templates${qs ? `?${qs}` : ""}`);
+  },
+
+  getTemplate: (id: string) => request<TemplateDetail>(`/templates/${id}`),
+
+  createTemplate: (data: {
+    title: string;
+    description?: string;
+    defence_tags?: string[];
+    preflight_answers?: Record<string, string>;
+    items?: TemplateChecklistItemCreate[];
+  }) => request<TemplateDetail>("/templates", { method: "POST", body: JSON.stringify(data) }),
+
+  saveAsTemplate: (changeId: string, data: { title?: string; description?: string }) =>
+    request<TemplateDetail>(`/changes/${changeId}/save-as-template`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  useTemplate: (templateId: string, data: {
+    title: string;
+    customer_id: string;
+    service_id: string;
+    environment_id: string;
+  }) => request<{ change_id: string }>(`/templates/${templateId}/use`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  }),
 };

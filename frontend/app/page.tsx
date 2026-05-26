@@ -99,6 +99,12 @@ export default function Home() {
             <div className="flex items-center gap-3">
               <UserSwitcher />
               <Link
+                href="/templates"
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Templates
+              </Link>
+              <Link
                 href="/changes/new"
                 className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition-colors"
               >
