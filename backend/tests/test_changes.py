@@ -271,3 +271,172 @@ def test_health(client):
     resp = client.get("/health")
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
+
+
+class TestMaintenanceWindow:
+    """Structured maintenance window fields on changes."""
+
+    def test_create_with_maintenance_window(self, client, sample_change_data):
+        resp = client.post(
+            "/api/v1/changes",
+            json={
+                "title": "Scheduled change",
+                **sample_change_data,
+                "maintenance_window_start": "2026-05-24T22:00:00Z",
+                "maintenance_window_end": "2026-05-25T02:00:00Z",
+                "maintenance_window_tz": "Europe/London",
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["maintenance_window_start"] is not None
+        assert data["maintenance_window_end"] is not None
+        assert data["maintenance_window_tz"] == "Europe/London"
+
+    def test_create_without_maintenance_window(self, client, sample_change_data):
+        resp = client.post(
+            "/api/v1/changes",
+            json={"title": "No window", **sample_change_data},
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["maintenance_window_start"] is None
+        assert data["maintenance_window_end"] is None
+        assert data["maintenance_window_tz"] is None
+
+    def test_end_must_be_after_start(self, client, sample_change_data):
+        resp = client.post(
+            "/api/v1/changes",
+            json={
+                "title": "Bad window",
+                **sample_change_data,
+                "maintenance_window_start": "2026-05-25T02:00:00Z",
+                "maintenance_window_end": "2026-05-24T22:00:00Z",
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_start_without_end_rejected(self, client, sample_change_data):
+        resp = client.post(
+            "/api/v1/changes",
+            json={
+                "title": "Missing end",
+                **sample_change_data,
+                "maintenance_window_start": "2026-05-24T22:00:00Z",
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_window_override_reason_stored(self, client, sample_change_data):
+        """When executing outside the window, the override reason is stored on the change."""
+        # Create with a window entirely in the past
+        resp = client.post(
+            "/api/v1/changes",
+            json={
+                "title": "Past window change",
+                **sample_change_data,
+                "maintenance_window_start": "2020-01-01T00:00:00Z",
+                "maintenance_window_end": "2020-01-01T04:00:00Z",
+                "maintenance_window_tz": "UTC",
+            },
+        )
+        change_id = resp.json()["id"]
+
+        # Fill preflight + checklist so it can pass review gates
+        preflight_resp = client.get("/api/v1/preflight-questions")
+        answers = {}
+        for section in preflight_resp.json()["sections"]:
+            for q in section["questions"]:
+                if q["required"]:
+                    answers[q["key"]] = f"Answer for {q['key']}"
+        client.patch(
+            f"/api/v1/changes/{change_id}",
+            json={"preflight_answers": answers},
+        )
+        for phase in ["pre_flight", "execution", "verification"]:
+            client.post(
+                f"/api/v1/changes/{change_id}/checklist",
+                json={"phase": phase, "description": f"{phase} step"},
+            )
+
+        # Move through: draft → in_review → approved
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "in_review"},
+        )
+        from tests.conftest import JANE
+
+        review = client.post(
+            f"/api/v1/changes/{change_id}/reviewers",
+            json={"reviewer_name": "Jane Smith"},
+        )
+        client.post(
+            f"/api/v1/changes/{change_id}/reviewers/{review.json()['id']}/decision",
+            json={"decision": "approved"},
+            headers=JANE,
+        )
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "approved"},
+        )
+
+        # Execute with a reason — window is in the past
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "executing", "reason": "Customer approved early start"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "executing"
+        assert resp.json()["window_override_reason"] == "Customer approved early start"
+
+        # Also visible on GET
+        detail = client.get(f"/api/v1/changes/{change_id}")
+        assert detail.json()["window_override_reason"] == "Customer approved early start"
+
+    def test_patch_maintenance_window(self, client, sample_change_data):
+        create = client.post(
+            "/api/v1/changes",
+            json={"title": "Will add window later", **sample_change_data},
+        )
+        change_id = create.json()["id"]
+
+        resp = client.patch(
+            f"/api/v1/changes/{change_id}",
+            json={
+                "maintenance_window_start": "2026-06-01T18:00:00Z",
+                "maintenance_window_end": "2026-06-01T22:00:00Z",
+                "maintenance_window_tz": "US/Eastern",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["maintenance_window_tz"] == "US/Eastern"
+
+    def test_clear_maintenance_window(self, client, sample_change_data):
+        """A maintenance window can be cleared by sending null values."""
+        create = client.post(
+            "/api/v1/changes",
+            json={
+                "title": "Has window",
+                **sample_change_data,
+                "maintenance_window_start": "2026-06-01T18:00:00Z",
+                "maintenance_window_end": "2026-06-01T22:00:00Z",
+                "maintenance_window_tz": "UTC",
+            },
+        )
+        change_id = create.json()["id"]
+        assert create.json()["maintenance_window_start"] is not None
+
+        resp = client.patch(
+            f"/api/v1/changes/{change_id}",
+            json={
+                "maintenance_window_start": None,
+                "maintenance_window_end": None,
+                "maintenance_window_tz": None,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["maintenance_window_start"] is None
+        assert data["maintenance_window_end"] is None
+        assert data["maintenance_window_tz"] is None

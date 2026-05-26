@@ -237,6 +237,14 @@ export default function Home() {
                             Needs your review
                           </span>
                         )}
+                        {change.window_override_reason && (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800"
+                            title={change.window_override_reason}
+                          >
+                            ⚠️ Outside window
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">

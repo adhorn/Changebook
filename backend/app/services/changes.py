@@ -115,8 +115,16 @@ def update_change(db: Session, change: Change, data: dict, actor_name: str) -> C
         data.setdefault("preflight_schema_version", PREFLIGHT_SCHEMA_VERSION)
         data["preflight_answered_at"] = datetime.now(UTC)
 
+    # Fields that can be explicitly set to NULL (cleared)
+    nullable_fields = {
+        "description",
+        "maintenance_window_start",
+        "maintenance_window_end",
+        "maintenance_window_tz",
+    }
+
     for key, value in data.items():
-        if value is not None:
+        if value is not None or key in nullable_fields:
             setattr(change, key, value)
 
     # Integrity guarantee: any edit invalidates existing reviews
@@ -155,6 +163,15 @@ def duplicate_change(db: Session, source: Change, overrides: dict, author_name: 
         preflight_schema_version=source.preflight_schema_version,
         preflight_answered_at=source.preflight_answered_at,
         defence_tags=source.defence_tags,
+        maintenance_window_start=(
+            overrides.get("maintenance_window_start") or source.maintenance_window_start
+        ),
+        maintenance_window_end=(
+            overrides.get("maintenance_window_end") or source.maintenance_window_end
+        ),
+        maintenance_window_tz=(
+            overrides.get("maintenance_window_tz") or source.maintenance_window_tz
+        ),
         cloned_from=source.id,
     )
     db.add(clone)
@@ -270,6 +287,53 @@ def transition_status(
                 f"Cannot mark done — {len(unverified)} hold point(s) not verified. "
                 f"All hold points must be verified before marking a change as done."
             )
+
+    # Window warning on transition to executing
+    if new_status == ChangeStatus.EXECUTING:
+        now = datetime.now(UTC)
+        if change.maintenance_window_start and now < change.maintenance_window_start:
+            window_data: dict = {
+                "window_start": change.maintenance_window_start.isoformat(),
+                "executed_at": now.isoformat(),
+            }
+            if reason:
+                window_data["operator_reason"] = reason
+            db.add(
+                AuditEvent(
+                    change_id=change.id,
+                    event_type="window_warning",
+                    actor_name=actor_name,
+                    description="Execution started before maintenance window opens.",
+                    event_data=window_data,
+                )
+            )
+        elif change.maintenance_window_end and now > change.maintenance_window_end:
+            window_data = {
+                "window_end": change.maintenance_window_end.isoformat(),
+                "executed_at": now.isoformat(),
+            }
+            if reason:
+                window_data["operator_reason"] = reason
+            db.add(
+                AuditEvent(
+                    change_id=change.id,
+                    event_type="window_warning",
+                    actor_name=actor_name,
+                    description="Execution started after maintenance window closed.",
+                    event_data=window_data,
+                )
+            )
+
+    # Store window override reason on the change for easy display
+    if (
+        new_status == ChangeStatus.EXECUTING
+        and reason
+        and change.maintenance_window_start
+        and change.maintenance_window_end
+    ):
+        now_check = datetime.now(UTC)
+        if now_check < change.maintenance_window_start or now_check > change.maintenance_window_end:
+            change.window_override_reason = reason
 
     # Staleness warning on transition to executing
     if new_status == ChangeStatus.EXECUTING and change.preflight_answered_at:

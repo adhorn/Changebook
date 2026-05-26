@@ -21,6 +21,9 @@ export default function NewChange() {
   const [customerId, setCustomerId] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [environmentId, setEnvironmentId] = useState("");
+  const [windowStart, setWindowStart] = useState("");
+  const [windowEnd, setWindowEnd] = useState("");
+  const [windowTz, setWindowTz] = useState("UTC");
   const [preflightAnswers, setPreflightAnswers] = useState<Record<string, string>>({});
 
   const selectedCustomer = customers.find((c) => c.id === customerId);
@@ -84,6 +87,9 @@ export default function NewChange() {
         service_id: serviceId,
         environment_id: environmentId,
         preflight_answers: Object.keys(preflightAnswers).length > 0 ? preflightAnswers : undefined,
+        maintenance_window_start: windowStart ? new Date(windowStart).toISOString() : undefined,
+        maintenance_window_end: windowEnd ? new Date(windowEnd).toISOString() : undefined,
+        maintenance_window_tz: windowStart ? windowTz : undefined,
       });
       router.push(`/changes/${change.id}`);
     } catch (err: unknown) {
@@ -199,6 +205,46 @@ export default function NewChange() {
                 onCreateNew={handleCreateEnvironment}
                 itemNoun="environment"
               />
+            </div>
+          </div>
+
+          {/* Maintenance window */}
+          <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+            <h2 className="text-lg font-medium text-gray-900">When</h2>
+            <p className="text-sm text-gray-500 -mt-2">
+              The maintenance window for this change. Optional — set it when you know the schedule.
+            </p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start</label>
+                <input
+                  type="datetime-local"
+                  value={windowStart}
+                  onChange={(e) => setWindowStart(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End</label>
+                <input
+                  type="datetime-local"
+                  value={windowEnd}
+                  onChange={(e) => setWindowEnd(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Timezone</label>
+                <select
+                  value={windowTz}
+                  onChange={(e) => setWindowTz(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                >
+                  {["UTC", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Copenhagen", "US/Eastern", "US/Central", "US/Mountain", "US/Pacific", "Asia/Tokyo", "Asia/Singapore", "Australia/Sydney"].map((tz) => (
+                    <option key={tz} value={tz}>{tz}</option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 

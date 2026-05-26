@@ -70,6 +70,10 @@ export interface Change {
   defence_tags: string[] | null;
   cloned_from: string | null;
   abort_reason: string | null;
+  window_override_reason: string | null;
+  maintenance_window_start: string | null;
+  maintenance_window_end: string | null;
+  maintenance_window_tz: string | null;
   created_at: string;
   updated_at: string;
   audit_event_count?: number;
@@ -192,6 +196,9 @@ export const api = {
     environment_id: string;
     preflight_answers?: Record<string, string>;
     defence_tags?: string[];
+    maintenance_window_start?: string;
+    maintenance_window_end?: string;
+    maintenance_window_tz?: string;
   }) => request<Change>("/changes", { method: "POST", body: JSON.stringify(data) }),
 
   updateChange: (id: string, data: Record<string, unknown>) =>

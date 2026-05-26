@@ -67,11 +67,23 @@ class Change(UUIDMixin, TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # Structured maintenance window — stored as UTC, tz records display timezone
+    maintenance_window_start: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    maintenance_window_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    maintenance_window_tz: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     # Defence tags — validated against ALLOWED_DEFENCE_TAGS
     defence_tags: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 
     # Abort reason — recorded when the change is aborted
     abort_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Window override — recorded when execution starts outside the maintenance window
+    window_override_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Duplicate flow — reference to the change this was cloned from
     cloned_from: Mapped[uuid.UUID | None] = mapped_column(
