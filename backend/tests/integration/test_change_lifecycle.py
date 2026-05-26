@@ -5,14 +5,7 @@ the full lifecycle — create, pre-flight, review, execute steps, verify,
 close — and confirms the audit trail is complete and correct.
 """
 
-import os
-
 import pytest
-
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("CHANGEBOOK_DATABASE_URL"),
-    reason="Requires Postgres",
-)
 
 
 # Complete set of required pre-flight answers for gate validation

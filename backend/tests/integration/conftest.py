@@ -1,13 +1,11 @@
 """Integration test fixtures using real Postgres.
 
-These tests require a running Postgres instance. In CI, this is provided
-by the GitHub Actions service container. Locally, use:
+These tests require a running Postgres instance. Locally, use:
 
     docker compose up db
 
 Then run:
 
-    CHANGEBOOK_DATABASE_URL=postgresql://changebook:changebook@localhost:5432/changebook_test \
     pytest tests/integration -v
 """
 
@@ -22,12 +20,9 @@ from app.core.database import get_db
 from app.main import app
 from app.models import Base
 
-# Skip entire module if no Postgres URL is configured
-POSTGRES_URL = os.environ.get("CHANGEBOOK_DATABASE_URL")
-
-pytestmark = pytest.mark.skipif(
-    not POSTGRES_URL,
-    reason="Requires CHANGEBOOK_DATABASE_URL pointing to a Postgres instance",
+POSTGRES_URL = os.environ.get(
+    "CHANGEBOOK_TEST_DATABASE_URL",
+    "postgresql://changebook:changebook@localhost:5432/changebook_test",
 )
 
 
