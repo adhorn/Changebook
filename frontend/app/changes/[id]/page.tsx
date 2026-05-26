@@ -1866,8 +1866,8 @@ export default function ChangeDetailPage() {
             </div>
           )}
 
-          {/* Assign reviewer — only the author can assign */}
-          {!isTerminal && isAuthor && (
+          {/* Assign reviewer — only in draft or in_review */}
+          {(isDraft || change.status === "in_review") && isAuthor && (
             <>
               {!addingReviewer ? (
                 <button

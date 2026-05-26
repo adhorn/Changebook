@@ -495,6 +495,13 @@ def assign_reviewer(
         raise HTTPException(status_code=404, detail="Change not found")
     _require_author(user, change)
 
+    reviewable = {"draft", "in_review"}
+    if change.status.value not in reviewable:
+        raise HTTPException(
+            status_code=422,
+            detail="Reviewers can only be assigned in draft or in_review.",
+        )
+
     reviewer_name = payload.reviewer_name or user.name
 
     # Author cannot review their own change

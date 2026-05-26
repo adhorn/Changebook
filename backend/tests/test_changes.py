@@ -223,6 +223,30 @@ class TestStateTransitions:
         assert resp.status_code == 200
         assert resp.json()["status"] == "aborted"
 
+    def test_cannot_assign_reviewer_during_execution(self, client, sample_change_data):
+        """Reviewers cannot be assigned once the change is past in_review."""
+        change_id = self._create_change(client, sample_change_data, ready_for_review=True)
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "in_review"},
+        )
+        self._approve_change(client, change_id)
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "approved"},
+        )
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "executing"},
+        )
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/reviewers",
+            json={"reviewer_name": "Late Reviewer"},
+        )
+        assert resp.status_code == 422
+        assert "draft or in_review" in resp.json()["detail"].lower()
+
     def test_done_is_terminal(self, client, sample_change_data):
         """Once done, a change cannot transition to any other state."""
         change_id = self._create_change(client, sample_change_data, ready_for_review=True)
