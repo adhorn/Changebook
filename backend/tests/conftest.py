@@ -9,10 +9,10 @@ from app.core.database import get_db
 from app.main import app
 from app.models import Base
 
-# Use the configured database URL, or fall back to the default Postgres URL
+# Test database — separate from the dev database to avoid data loss
 SQLALCHEMY_TEST_URL = os.environ.get(
-    "CHANGEBOOK_DATABASE_URL",
-    "postgresql://changebook:changebook@localhost:5432/changebook",
+    "CHANGEBOOK_TEST_DATABASE_URL",
+    "postgresql://changebook:changebook@localhost:5432/changebook_test",
 )
 
 engine = create_engine(SQLALCHEMY_TEST_URL)

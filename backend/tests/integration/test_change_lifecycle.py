@@ -5,16 +5,6 @@ the full lifecycle — create, pre-flight, review, execute steps, verify,
 close — and confirms the audit trail is complete and correct.
 """
 
-import os
-
-import pytest
-
-pytestmark = pytest.mark.skipif(
-    not os.environ.get("CHANGEBOOK_DATABASE_URL"),
-    reason="Requires Postgres",
-)
-
-
 # Complete set of required pre-flight answers for gate validation
 COMPLETE_PREFLIGHT = {
     "what_is_this_change": "Increase connection pool from 100 to 150",
@@ -144,19 +134,39 @@ class TestFullChangeLifecycle:
         _assign_and_approve_reviewer(client, change_id)
 
         # 6. Walk through remaining transitions
-        transitions = [
+        for target_status, description in [
             ("approved", "Reviewer approved"),
             ("executing", "Start execution"),
-            ("done", "Mark as done"),
-        ]
-
-        for target_status, description in transitions:
+        ]:
             resp = client.post(
                 f"/api/v1/changes/{change_id}/transition",
                 params={"target_status": target_status},
             )
             assert resp.status_code == 200, f"Failed at '{description}': {resp.json()}"
             assert resp.json()["status"] == target_status
+
+        # 6b. Complete all checklist items before marking done
+        items = client.get(f"/api/v1/changes/{change_id}/checklist").json()
+        for item in items:
+            resp = client.post(
+                f"/api/v1/changes/{change_id}/checklist/{item['id']}/complete",
+                json={"observed_result": "OK", "status": "completed"},
+            )
+            assert resp.status_code == 200, f"Failed to complete item: {resp.json()}"
+            # Verify hold points so subsequent items can proceed
+            if item.get("is_hold_point"):
+                resp = client.post(
+                    f"/api/v1/changes/{change_id}/checklist/{item['id']}/hold-point-verify",
+                    json={"verified_by": "Second Person"},
+                )
+                assert resp.status_code == 200, f"Failed to verify hold point: {resp.json()}"
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "done"},
+        )
+        assert resp.status_code == 200, f"Failed at 'Mark as done': {resp.json()}"
+        assert resp.json()["status"] == "done"
 
         # 7. Confirm the change is done
         final = client.get(f"/api/v1/changes/{change_id}").json()

@@ -246,6 +246,31 @@ def transition_status(
                 f"Cannot approve — not all reviewers have approved. Outstanding: {pending_names}"
             )
 
+    # Gate on transition to done: all checklist items must be completed
+    if new_status == ChangeStatus.DONE:
+        from app.services.execution import _is_item_completed
+
+        all_items = list_checklist_items(db, change.id)
+        incomplete = [i for i in all_items if not _is_item_completed(i)]
+        if incomplete:
+            raise ValueError(
+                f"Cannot mark done — {len(incomplete)} checklist item(s) not completed. "
+                f"All items must be completed before marking a change as done."
+            )
+        # Also check hold points are verified
+        unverified = [
+            i
+            for i in all_items
+            if i.is_hold_point
+            and i.completion is not None
+            and i.completion.hold_point_verified_by is None
+        ]
+        if unverified:
+            raise ValueError(
+                f"Cannot mark done — {len(unverified)} hold point(s) not verified. "
+                f"All hold points must be verified before marking a change as done."
+            )
+
     # Staleness warning on transition to executing
     if new_status == ChangeStatus.EXECUTING and change.preflight_answered_at:
         answered_at = change.preflight_answered_at
