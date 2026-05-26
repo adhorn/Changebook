@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.auth import MOCK_USERS
 from app.core.database import get_db
 from app.core.tenant import get_default_org_id
 from app.models.customer import Customer, Service
@@ -137,3 +138,12 @@ def create_environment(
 @router.get("/environments", response_model=list[EnvironmentResponse])
 def list_environments(db: Session = Depends(get_db)):
     return db.query(Environment).all()
+
+
+# --- People (known users) ---
+
+
+@router.get("/people", response_model=list[str])
+def list_people():
+    """Return all known users in the system."""
+    return sorted(u.name for u in MOCK_USERS)

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Customer, Environment, PreflightSection } from "@/lib/api";
 import UserSwitcher from "@/components/UserSwitcher";
+import SearchableSelect from "@/components/SearchableSelect";
 
 export default function NewChange() {
   const router = useRouter();
@@ -36,6 +37,30 @@ export default function NewChange() {
     setPreflightAnswers((prev) => ({ ...prev, [key]: value }));
   }
 
+  async function handleCreateCustomer(name: string): Promise<string | null> {
+    const newCustomer = await api.createCustomer({ name, services: [{ name: "Default" }] });
+    setCustomers((prev) => [...prev, newCustomer]);
+    setServiceId(newCustomer.services[0]?.id || "");
+    return newCustomer.id;
+  }
+
+  async function handleCreateService(name: string): Promise<string | null> {
+    if (!customerId) return null;
+    const newService = await api.addService(customerId, { name });
+    setCustomers((prev) =>
+      prev.map((c) =>
+        c.id === customerId ? { ...c, services: [...c.services, newService] } : c
+      )
+    );
+    return newService.id;
+  }
+
+  async function handleCreateEnvironment(name: string): Promise<string | null> {
+    const newEnv = await api.createEnvironment({ name });
+    setEnvironments((prev) => [...prev, newEnv]);
+    return newEnv.id;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
@@ -56,6 +81,16 @@ export default function NewChange() {
       setSubmitting(false);
     }
   }
+
+  const customerOptions = customers.map((c) => ({ id: c.id, label: c.name }));
+  const serviceOptions = selectedCustomer
+    ? selectedCustomer.services.map((s) => ({ id: s.id, label: s.name }))
+    : [];
+  const environmentOptions = environments.map((e) => ({
+    id: e.id,
+    label: e.name,
+    sublabel: e.platform || undefined,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -108,7 +143,6 @@ export default function NewChange() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
               />
             </div>
-            {/* Author comes from auth — shown in the user switcher */}
           </div>
 
           {/* Customer / Service / Environment */}
@@ -118,65 +152,43 @@ export default function NewChange() {
               One change, one customer, one service, one environment.
             </p>
             <div className="grid grid-cols-1 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Customer *
-                </label>
-                <select
+              <SearchableSelect
+                label="Customer"
+                required
+                options={customerOptions}
+                value={customerId}
+                onChange={(id) => {
+                  setCustomerId(id);
+                  setServiceId("");
+                }}
+                placeholder="Select customer..."
+                onCreateNew={handleCreateCustomer}
+                itemNoun="customer"
+              />
+
+              {selectedCustomer && (
+                <SearchableSelect
+                  label="Service"
                   required
-                  value={customerId}
-                  onChange={(e) => {
-                    setCustomerId(e.target.value);
-                    setServiceId(""); // reset service when customer changes
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                >
-                  <option value="">Select customer...</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {selectedCustomer && selectedCustomer.services.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Service *
-                  </label>
-                  <select
-                    required
-                    value={serviceId}
-                    onChange={(e) => setServiceId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    <option value="">Select service...</option>
-                    {selectedCustomer.services.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  options={serviceOptions}
+                  value={serviceId}
+                  onChange={setServiceId}
+                  placeholder="Select service..."
+                  onCreateNew={handleCreateService}
+                  itemNoun="service"
+                />
               )}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Environment *
-                </label>
-                <select
-                  required
-                  value={environmentId}
-                  onChange={(e) => setEnvironmentId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                >
-                  <option value="">Select environment...</option>
-                  {environments.map((env) => (
-                    <option key={env.id} value={env.id}>
-                      {env.name} {env.platform ? `(${env.platform})` : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
+
+              <SearchableSelect
+                label="Environment"
+                required
+                options={environmentOptions}
+                value={environmentId}
+                onChange={setEnvironmentId}
+                placeholder="Select environment..."
+                onCreateNew={handleCreateEnvironment}
+                itemNoun="environment"
+              />
             </div>
           </div>
 

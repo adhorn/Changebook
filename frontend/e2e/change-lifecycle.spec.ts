@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { ensureCustomer, ensureEnvironment, switchUser, USERS } from "./helpers";
+import { ensureCustomer, ensureEnvironment, switchUser, pickFirstOption, USERS } from "./helpers";
 
 /**
  * Full change lifecycle E2E test.
@@ -28,15 +28,11 @@ test.describe.serial("Change lifecycle", () => {
     await page.getByPlaceholder("e.g., Update connection pool").fill("E2E: Upgrade Redis to 7.4");
     await page.getByPlaceholder("Brief summary").fill("Rolling upgrade of Redis cluster.");
 
-    // Select customer, service, environment (use first real option for each)
-    const customerSelect = page.locator('select').nth(0);
-    await customerSelect.selectOption({ index: 1 });
-    // Wait for service dropdown to render with options
+    // Select customer, service, environment from searchable dropdowns
+    await pickFirstOption(page, "Customer *");
     await page.waitForTimeout(500);
-    const serviceSelect = page.locator('select').nth(1);
-    await serviceSelect.selectOption({ index: 1 });
-    const envSelect = page.locator('select').nth(2);
-    await envSelect.selectOption({ index: 1 });
+    await pickFirstOption(page, "Service *");
+    await pickFirstOption(page, "Environment *");
 
     // Submit
     await page.getByRole("button", { name: "Create Change" }).click();
@@ -131,8 +127,7 @@ test.describe.serial("Change lifecycle", () => {
     await page.waitForLoadState("networkidle");
 
     await page.getByRole("button", { name: "+ Assign reviewer" }).click();
-    await page.getByPlaceholder("Reviewer name...").fill("Bob Reviewer");
-    await page.getByRole("button", { name: "Assign" }).click();
+    await page.locator("select").last().selectOption("Bob Reviewer");
     await page.waitForTimeout(500);
     await expect(page.getByText("Bob Reviewer")).toBeVisible();
     await expect(page.getByText("pending")).toBeVisible();
