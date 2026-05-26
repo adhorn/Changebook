@@ -981,6 +981,28 @@ export default function ChangeDetailPage() {
     }
   }
 
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateTitle, setTemplateTitle] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+
+  async function handleSaveAsTemplate() {
+    setSavingTemplate(true);
+    setError(null);
+    try {
+      await api.saveAsTemplate(id, {
+        title: templateTitle.trim() || undefined,
+      });
+      setShowSaveTemplate(false);
+      setTemplateTitle("");
+      // Brief success feedback
+      setError(null);
+      alert("Template saved to the library.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save template");
+    }
+    setSavingTemplate(false);
+  }
+
   async function handleExport() {
     setError(null);
     try {
@@ -1180,6 +1202,15 @@ export default function ChangeDetailPage() {
               >
                 Duplicate
               </button>
+              <button
+                onClick={() => {
+                  setTemplateTitle(`${change.title}`);
+                  setShowSaveTemplate(true);
+                }}
+                className="px-3 py-1.5 text-xs font-medium text-indigo-600 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-50"
+              >
+                Save as Template
+              </button>
               {!isTerminal && isAuthor && (
                 <button
                   onClick={() => setShowAbort(!showAbort)}
@@ -1358,6 +1389,47 @@ export default function ChangeDetailPage() {
               </button>
               <button
                 onClick={() => setShowDuplicate(false)}
+                className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Save as template form */}
+        {showSaveTemplate && (
+          <div className="bg-white rounded-lg border border-indigo-200 p-6 space-y-3">
+            <h2 className="text-sm font-medium text-gray-900">
+              Save as Template
+            </h2>
+            <p className="text-xs text-gray-500">
+              Saves the checklist, defence tags, and change profile answers to the template library.
+              Customer, service, environment, and maintenance window are not included.
+            </p>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">
+                Template name
+              </label>
+              <input
+                type="text"
+                value={templateTitle}
+                onChange={(e) => setTemplateTitle(e.target.value)}
+                placeholder={`${change.title} (template)`}
+                className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSaveAsTemplate}
+                disabled={savingTemplate}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {savingTemplate ? "Saving..." : "Save Template"}
+              </button>
+              <button
+                onClick={() => setShowSaveTemplate(false)}
                 className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
               >
                 Cancel

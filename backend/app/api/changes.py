@@ -30,10 +30,12 @@ from app.schemas.checklist import (
     HoldPointVerify,
 )
 from app.schemas.reviews import ReviewDecisionSubmit, ReviewerAssign, ReviewResponse
+from app.schemas.templates import SaveAsTemplate, TemplateDetailResponse
 from app.services import changes as change_service
 from app.services import execution as execution_service
 from app.services import export as export_service
 from app.services import reviews as review_service
+from app.services import templates as template_service
 
 router = APIRouter(prefix="/changes", tags=["changes"])
 
@@ -182,6 +184,33 @@ def duplicate_change(
     overrides = payload.model_dump(exclude_unset=True)
     clone = change_service.duplicate_change(db, source, overrides, user.name)
     return clone
+
+
+@router.post(
+    "/{change_id}/save-as-template",
+    response_model=TemplateDetailResponse,
+    status_code=201,
+)
+def save_as_template(
+    change_id: uuid.UUID,
+    payload: SaveAsTemplate,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+
+    template = template_service.save_change_as_template(
+        db,
+        change,
+        title=payload.title,
+        description=payload.description,
+        author_name=user.name,
+    )
+    resp = TemplateDetailResponse.model_validate(template)
+    resp.item_count = len(template.items)
+    return resp
 
 
 @router.get("/{change_id}/export/markdown")
