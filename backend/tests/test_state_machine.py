@@ -45,6 +45,16 @@ def _add_items_to_all_phases(client, change_id):
         )
 
 
+def _complete_all_items(client, change_id):
+    """Complete every checklist item for a change."""
+    items = client.get(f"/api/v1/changes/{change_id}/checklist").json()
+    for item in items:
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{item['id']}/complete",
+            json={"observed_result": "OK", "status": "completed"},
+        )
+
+
 def _approve_change(client, change_id):
     """Assign a reviewer and approve."""
     review = client.post(
@@ -156,13 +166,23 @@ class TestFullLifecycleWithGates:
         # Approve (requires reviewer)
         _approve_change(client, change_id)
 
-        for status in ["approved", "executing", "done"]:
+        for status in ["approved", "executing"]:
             resp = client.post(
                 f"/api/v1/changes/{change_id}/transition",
                 params={"target_status": status},
             )
             assert resp.status_code == 200, f"Failed transition to {status}: {resp.json()}"
             assert resp.json()["status"] == status
+
+        # Complete all checklist items before marking done
+        _complete_all_items(client, change_id)
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "done"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "done"
 
     def test_abort_bypasses_all_gates(self, client, sample_change_data):
         """Abort is always allowed regardless of completeness."""
@@ -192,6 +212,116 @@ class TestFullLifecycleWithGates:
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "draft"
+
+
+def _get_change_to_executing(client, sample_change_data):
+    """Helper: create a change and advance it to executing status."""
+    change_id = _create_change_with_preflight(client, sample_change_data)
+    _add_items_to_all_phases(client, change_id)
+    client.post(
+        f"/api/v1/changes/{change_id}/transition",
+        params={"target_status": "in_review"},
+    )
+    _approve_change(client, change_id)
+    client.post(
+        f"/api/v1/changes/{change_id}/transition",
+        params={"target_status": "approved"},
+    )
+    client.post(
+        f"/api/v1/changes/{change_id}/transition",
+        params={"target_status": "executing"},
+    )
+    return change_id
+
+
+class TestExecutionCompletenessGate:
+    """Cannot mark done unless all checklist items are completed."""
+
+    def test_cannot_mark_done_without_completing_items(self, client, sample_change_data):
+        """Transition executing → done blocked when items are incomplete."""
+        change_id = _get_change_to_executing(client, sample_change_data)
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "done"},
+        )
+        assert resp.status_code == 422
+        assert "not completed" in resp.json()["detail"].lower()
+
+    def test_unverified_hold_point_blocks_done(self, client, sample_change_data):
+        """An unverified hold point prevents completing subsequent items, blocking done."""
+        # Build the change with a hold point in the execution phase
+        change_id = _create_change_with_preflight(client, sample_change_data)
+
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist",
+            json={"phase": "pre_flight", "description": "pre-flight step"},
+        )
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist",
+            json={"phase": "execution", "description": "exec step", "is_hold_point": True},
+        )
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist",
+            json={"phase": "verification", "description": "verify step"},
+        )
+
+        # Advance to executing
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "in_review"},
+        )
+        _approve_change(client, change_id)
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "approved"},
+        )
+        client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "executing"},
+        )
+
+        # Complete pre-flight and execution items (but don't verify the hold point)
+        items = client.get(f"/api/v1/changes/{change_id}/checklist").json()
+        for item in items:
+            resp = client.post(
+                f"/api/v1/changes/{change_id}/checklist/{item['id']}/complete",
+                json={"observed_result": "OK", "status": "completed"},
+            )
+            # The verification item will fail because the hold point is unverified
+            if resp.status_code != 200:
+                break
+
+        # Try to mark done — should fail because items remain incomplete
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "done"},
+        )
+        assert resp.status_code == 422
+        assert "not completed" in resp.json()["detail"].lower()
+
+    def test_can_mark_done_after_completing_all_items(self, client, sample_change_data):
+        """Transition to done succeeds when all items are completed."""
+        change_id = _get_change_to_executing(client, sample_change_data)
+        _complete_all_items(client, change_id)
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "done"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "done"
+
+    def test_abort_still_works_with_incomplete_items(self, client, sample_change_data):
+        """Abort bypasses the execution completeness gate."""
+        change_id = _get_change_to_executing(client, sample_change_data)
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "aborted", "reason": "Rollback needed"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "aborted"
 
 
 class TestStalenessWarning:

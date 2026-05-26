@@ -924,7 +924,7 @@ export default function ChangeDetailPage() {
   }
 
   // Determine available transitions
-  const transitions: { label: string; target: ChangeStatus; style: string }[] =
+  const transitions: { label: string; target: ChangeStatus; style: string; disabled?: boolean; hint?: string }[] =
     [];
   if (change.status === "draft") {
     transitions.push({
@@ -950,10 +950,13 @@ export default function ChangeDetailPage() {
       style: "bg-orange-600 text-white hover:bg-orange-700",
     });
   } else if (change.status === "executing") {
+    const allComplete = execStatus?.all_complete ?? false;
     transitions.push({
       label: "Mark Done",
       target: "done",
       style: "bg-green-600 text-white hover:bg-green-700",
+      disabled: !allComplete,
+      hint: !allComplete ? "Complete all checklist items first" : undefined,
     });
   }
 
@@ -1056,8 +1059,9 @@ export default function ChangeDetailPage() {
                 <button
                   key={t.target}
                   onClick={() => handleTransition(t.target)}
-                  disabled={transitioning}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-lg disabled:opacity-50 ${t.style}`}
+                  disabled={transitioning || t.disabled}
+                  title={t.hint}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${t.style}`}
                 >
                   {t.label}
                 </button>

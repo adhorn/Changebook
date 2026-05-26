@@ -190,13 +190,28 @@ class TestStateTransitions:
         # Approve (requires reviewer)
         self._approve_change(client, change_id)
 
-        for status in ["approved", "executing", "done"]:
+        for status in ["approved", "executing"]:
             resp = client.post(
                 f"/api/v1/changes/{change_id}/transition",
                 params={"target_status": status},
             )
             assert resp.status_code == 200, f"Failed transition to {status}: {resp.json()}"
             assert resp.json()["status"] == status
+
+        # Complete all checklist items before marking done
+        items = client.get(f"/api/v1/changes/{change_id}/checklist").json()
+        for item in items:
+            client.post(
+                f"/api/v1/changes/{change_id}/checklist/{item['id']}/complete",
+                json={"observed_result": "OK", "status": "completed"},
+            )
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/transition",
+            params={"target_status": "done"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "done"
 
     def test_abort_from_any_active_state(self, client, sample_change_data):
         """A change can be aborted from any active state."""
