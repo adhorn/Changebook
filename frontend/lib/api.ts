@@ -70,6 +70,7 @@ export interface Change {
   defence_tags: string[] | null;
   cloned_from: string | null;
   abort_reason: string | null;
+  window_override_reason: string | null;
   maintenance_window_start: string | null;
   maintenance_window_end: string | null;
   maintenance_window_tz: string | null;

@@ -111,6 +111,7 @@ class ChangeResponse(BaseModel):
     defence_tags: list[str] | None
     cloned_from: uuid.UUID | None
     abort_reason: str | None = None
+    window_override_reason: str | None = None
     maintenance_window_start: datetime | None = None
     maintenance_window_end: datetime | None = None
     maintenance_window_tz: str | None = None

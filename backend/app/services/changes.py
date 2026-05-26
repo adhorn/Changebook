@@ -316,6 +316,17 @@ def transition_status(
                 )
             )
 
+    # Store window override reason on the change for easy display
+    if (
+        new_status == ChangeStatus.EXECUTING
+        and reason
+        and change.maintenance_window_start
+        and change.maintenance_window_end
+    ):
+        now_check = datetime.now(UTC)
+        if now_check < change.maintenance_window_start or now_check > change.maintenance_window_end:
+            change.window_override_reason = reason
+
     # Staleness warning on transition to executing
     if new_status == ChangeStatus.EXECUTING and change.preflight_answered_at:
         answered_at = change.preflight_answered_at

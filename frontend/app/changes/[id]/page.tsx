@@ -1291,6 +1291,18 @@ export default function ChangeDetailPage() {
           </div>
         )}
 
+        {/* Window override banner */}
+        {change.window_override_reason && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+            <h3 className="text-sm font-medium text-amber-900">
+              ⚠️ Executed outside maintenance window
+            </h3>
+            <p className="mt-1 text-sm text-amber-800 whitespace-pre-wrap">
+              {change.window_override_reason}
+            </p>
+          </div>
+        )}
+
         {/* Duplicate form */}
         {showDuplicate && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
