@@ -302,6 +302,34 @@ export default function TemplateDetailPage() {
           </div>
         )}
 
+        {/* Preflight answers preview */}
+        {template.preflight_answers &&
+          Object.keys(template.preflight_answers).length > 0 && (
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">
+                Change Profile (pre-filled)
+              </h2>
+              <dl className="space-y-2">
+                {Object.entries(template.preflight_answers).map(
+                  ([key, value]) =>
+                    value ? (
+                      <div
+                        key={key}
+                        className="pl-3 border-l-2 border-gray-100"
+                      >
+                        <dt className="text-xs font-medium text-gray-500">
+                          {key.replace(/_/g, " ")}
+                        </dt>
+                        <dd className="mt-0.5 text-sm text-gray-900 whitespace-pre-wrap">
+                          {value}
+                        </dd>
+                      </div>
+                    ) : null
+                )}
+              </dl>
+            </div>
+          )}
+
         {/* Checklist preview */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
           <h2 className="text-lg font-medium text-gray-900">Checklist</h2>
@@ -365,34 +393,6 @@ export default function TemplateDetailPage() {
             );
           })}
         </div>
-
-        {/* Preflight answers preview */}
-        {template.preflight_answers &&
-          Object.keys(template.preflight_answers).length > 0 && (
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">
-                Change Profile (pre-filled)
-              </h2>
-              <dl className="space-y-2">
-                {Object.entries(template.preflight_answers).map(
-                  ([key, value]) =>
-                    value ? (
-                      <div
-                        key={key}
-                        className="pl-3 border-l-2 border-gray-100"
-                      >
-                        <dt className="text-xs font-medium text-gray-500">
-                          {key.replace(/_/g, " ")}
-                        </dt>
-                        <dd className="mt-0.5 text-sm text-gray-900 whitespace-pre-wrap">
-                          {value}
-                        </dd>
-                      </div>
-                    ) : null
-                )}
-              </dl>
-            </div>
-          )}
       </main>
     </div>
   );
