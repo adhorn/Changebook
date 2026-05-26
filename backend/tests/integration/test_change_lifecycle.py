@@ -5,9 +5,6 @@ the full lifecycle — create, pre-flight, review, execute steps, verify,
 close — and confirms the audit trail is complete and correct.
 """
 
-import pytest
-
-
 # Complete set of required pre-flight answers for gate validation
 COMPLETE_PREFLIGHT = {
     "what_is_this_change": "Increase connection pool from 100 to 150",
