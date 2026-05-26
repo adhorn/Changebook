@@ -411,3 +411,32 @@ class TestMaintenanceWindow:
         assert resp.status_code == 200
         data = resp.json()
         assert data["maintenance_window_tz"] == "US/Eastern"
+
+    def test_clear_maintenance_window(self, client, sample_change_data):
+        """A maintenance window can be cleared by sending null values."""
+        create = client.post(
+            "/api/v1/changes",
+            json={
+                "title": "Has window",
+                **sample_change_data,
+                "maintenance_window_start": "2026-06-01T18:00:00Z",
+                "maintenance_window_end": "2026-06-01T22:00:00Z",
+                "maintenance_window_tz": "UTC",
+            },
+        )
+        change_id = create.json()["id"]
+        assert create.json()["maintenance_window_start"] is not None
+
+        resp = client.patch(
+            f"/api/v1/changes/{change_id}",
+            json={
+                "maintenance_window_start": None,
+                "maintenance_window_end": None,
+                "maintenance_window_tz": None,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["maintenance_window_start"] is None
+        assert data["maintenance_window_end"] is None
+        assert data["maintenance_window_tz"] is None

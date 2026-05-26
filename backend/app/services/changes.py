@@ -115,8 +115,16 @@ def update_change(db: Session, change: Change, data: dict, actor_name: str) -> C
         data.setdefault("preflight_schema_version", PREFLIGHT_SCHEMA_VERSION)
         data["preflight_answered_at"] = datetime.now(UTC)
 
+    # Fields that can be explicitly set to NULL (cleared)
+    nullable_fields = {
+        "description",
+        "maintenance_window_start",
+        "maintenance_window_end",
+        "maintenance_window_tz",
+    }
+
     for key, value in data.items():
-        if value is not None:
+        if value is not None or key in nullable_fields:
             setattr(change, key, value)
 
     # Integrity guarantee: any edit invalidates existing reviews
