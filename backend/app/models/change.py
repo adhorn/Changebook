@@ -67,6 +67,15 @@ class Change(UUIDMixin, TimestampMixin, Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # Structured maintenance window — stored as UTC, tz records display timezone
+    maintenance_window_start: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    maintenance_window_end: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    maintenance_window_tz: Mapped[str | None] = mapped_column(String(50), nullable=True)
+
     # Defence tags — validated against ALLOWED_DEFENCE_TAGS
     defence_tags: Mapped[list | None] = mapped_column(JSONB, nullable=True)
 

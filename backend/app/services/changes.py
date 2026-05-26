@@ -155,6 +155,15 @@ def duplicate_change(db: Session, source: Change, overrides: dict, author_name: 
         preflight_schema_version=source.preflight_schema_version,
         preflight_answered_at=source.preflight_answered_at,
         defence_tags=source.defence_tags,
+        maintenance_window_start=(
+            overrides.get("maintenance_window_start") or source.maintenance_window_start
+        ),
+        maintenance_window_end=(
+            overrides.get("maintenance_window_end") or source.maintenance_window_end
+        ),
+        maintenance_window_tz=(
+            overrides.get("maintenance_window_tz") or source.maintenance_window_tz
+        ),
         cloned_from=source.id,
     )
     db.add(clone)
@@ -269,6 +278,36 @@ def transition_status(
             raise ValueError(
                 f"Cannot mark done — {len(unverified)} hold point(s) not verified. "
                 f"All hold points must be verified before marking a change as done."
+            )
+
+    # Window warning on transition to executing
+    if new_status == ChangeStatus.EXECUTING:
+        now = datetime.now(UTC)
+        if change.maintenance_window_start and now < change.maintenance_window_start:
+            db.add(
+                AuditEvent(
+                    change_id=change.id,
+                    event_type="window_warning",
+                    actor_name=actor_name,
+                    description="Execution started before maintenance window opens.",
+                    event_data={
+                        "window_start": change.maintenance_window_start.isoformat(),
+                        "executed_at": now.isoformat(),
+                    },
+                )
+            )
+        elif change.maintenance_window_end and now > change.maintenance_window_end:
+            db.add(
+                AuditEvent(
+                    change_id=change.id,
+                    event_type="window_warning",
+                    actor_name=actor_name,
+                    description="Execution started after maintenance window closed.",
+                    event_data={
+                        "window_end": change.maintenance_window_end.isoformat(),
+                        "executed_at": now.isoformat(),
+                    },
+                )
             )
 
     # Staleness warning on transition to executing

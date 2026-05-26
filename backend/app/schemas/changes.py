@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from app.models.change import ALLOWED_DEFENCE_TAGS, ChangeStatus
 
@@ -18,6 +18,9 @@ class ChangeCreate(BaseModel):
     preflight_answers: dict | None = None
     defence_tags: list[str] | None = None
     cloned_from: uuid.UUID | None = None
+    maintenance_window_start: datetime | None = None
+    maintenance_window_end: datetime | None = None
+    maintenance_window_tz: str | None = None
 
     @field_validator("defence_tags")
     @classmethod
@@ -31,12 +34,26 @@ class ChangeCreate(BaseModel):
             )
         return v
 
+    @model_validator(mode="after")
+    def validate_maintenance_window(self) -> "ChangeCreate":
+        start, end = self.maintenance_window_start, self.maintenance_window_end
+        if start and not end:
+            raise ValueError("maintenance_window_end is required when start is set")
+        if end and not start:
+            raise ValueError("maintenance_window_start is required when end is set")
+        if start and end and end <= start:
+            raise ValueError("maintenance_window_end must be after start")
+        return self
+
 
 class ChangeDuplicate(BaseModel):
     title: str | None = None
     customer_id: uuid.UUID | None = None
     service_id: uuid.UUID | None = None
     environment_id: uuid.UUID | None = None
+    maintenance_window_start: datetime | None = None
+    maintenance_window_end: datetime | None = None
+    maintenance_window_tz: str | None = None
 
 
 class ChangeUpdate(BaseModel):
@@ -47,6 +64,9 @@ class ChangeUpdate(BaseModel):
     environment_id: uuid.UUID | None = None
     preflight_answers: dict | None = None
     defence_tags: list[str] | None = None
+    maintenance_window_start: datetime | None = None
+    maintenance_window_end: datetime | None = None
+    maintenance_window_tz: str | None = None
 
     @field_validator("defence_tags")
     @classmethod
@@ -59,6 +79,17 @@ class ChangeUpdate(BaseModel):
                 f"Invalid defence tags: {invalid}. Allowed tags: {ALLOWED_DEFENCE_TAGS}"
             )
         return v
+
+    @model_validator(mode="after")
+    def validate_maintenance_window(self) -> "ChangeUpdate":
+        start, end = self.maintenance_window_start, self.maintenance_window_end
+        if start and not end:
+            raise ValueError("maintenance_window_end is required when start is set")
+        if end and not start:
+            raise ValueError("maintenance_window_start is required when end is set")
+        if start and end and end <= start:
+            raise ValueError("maintenance_window_end must be after start")
+        return self
 
 
 # --- Response schemas ---
@@ -80,6 +111,9 @@ class ChangeResponse(BaseModel):
     defence_tags: list[str] | None
     cloned_from: uuid.UUID | None
     abort_reason: str | None = None
+    maintenance_window_start: datetime | None = None
+    maintenance_window_end: datetime | None = None
+    maintenance_window_tz: str | None = None
     created_at: datetime
     updated_at: datetime
     audit_event_count: int | None = None

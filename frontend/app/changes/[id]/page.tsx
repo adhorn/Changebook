@@ -679,6 +679,8 @@ export default function ChangeDetailPage() {
   // Duplicate author comes from auth headers
   const [dupTitle, setDupTitle] = useState("");
   const [duplicating, setDuplicating] = useState(false);
+  const [showWindowWarning, setShowWindowWarning] = useState(false);
+  const [windowWarningMessage, setWindowWarningMessage] = useState("");
 
   // Inline editing for draft details (title, description, customer/service/environment)
   const [editingDetails, setEditingDetails] = useState(false);
@@ -687,6 +689,9 @@ export default function ChangeDetailPage() {
   const [editCustomerId, setEditCustomerId] = useState("");
   const [editServiceId, setEditServiceId] = useState("");
   const [editEnvironmentId, setEditEnvironmentId] = useState("");
+  const [editWindowStart, setEditWindowStart] = useState("");
+  const [editWindowEnd, setEditWindowEnd] = useState("");
+  const [editWindowTz, setEditWindowTz] = useState("UTC");
   const [savingDetails, setSavingDetails] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [environments, setEnvironments] = useState<Environment[]>([]);
@@ -749,6 +754,40 @@ export default function ChangeDetailPage() {
     setTransitioning(false);
   }
 
+  function handleTransitionClick(target: ChangeStatus) {
+    if (!change) return;
+    if (target === "executing" && change.maintenance_window_start && change.maintenance_window_end) {
+      const now = new Date();
+      const start = new Date(change.maintenance_window_start);
+      const end = new Date(change.maintenance_window_end);
+      const tz = change.maintenance_window_tz || "UTC";
+      const fmt = (d: Date) =>
+        d.toLocaleString("en-GB", {
+          weekday: "short",
+          day: "numeric",
+          month: "short",
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: tz,
+        });
+      if (now < start) {
+        setWindowWarningMessage(
+          `The maintenance window has not opened yet. It starts ${fmt(start)} ${tz}. You are about to execute before the agreed window.`
+        );
+        setShowWindowWarning(true);
+        return;
+      }
+      if (now > end) {
+        setWindowWarningMessage(
+          `The maintenance window closed at ${fmt(end)} ${tz}. You are about to execute after the agreed window.`
+        );
+        setShowWindowWarning(true);
+        return;
+      }
+    }
+    handleTransition(target);
+  }
+
   const [addingReviewer, setAddingReviewer] = useState(false);
   const [knownPeople, setKnownPeople] = useState<string[]>([]);
 
@@ -804,6 +843,12 @@ export default function ChangeDetailPage() {
     }
   }
 
+  function toLocalInput(isoStr: string | null): string {
+    if (!isoStr) return "";
+    // datetime-local inputs need "YYYY-MM-DDTHH:MM" format
+    return isoStr.slice(0, 16);
+  }
+
   function startEditingDetails() {
     if (!change) return;
     setEditTitle(change.title);
@@ -811,6 +856,9 @@ export default function ChangeDetailPage() {
     setEditCustomerId(change.customer_id);
     setEditServiceId(change.service_id);
     setEditEnvironmentId(change.environment_id);
+    setEditWindowStart(toLocalInput(change.maintenance_window_start));
+    setEditWindowEnd(toLocalInput(change.maintenance_window_end));
+    setEditWindowTz(change.maintenance_window_tz || "UTC");
     setEditingDetails(true);
     // Load customers/environments for dropdowns
     api.listCustomers().then(setCustomers).catch(console.error);
@@ -836,6 +884,9 @@ export default function ChangeDetailPage() {
         customer_id: editCustomerId,
         service_id: editServiceId,
         environment_id: editEnvironmentId,
+        maintenance_window_start: editWindowStart ? new Date(editWindowStart).toISOString() : null,
+        maintenance_window_end: editWindowEnd ? new Date(editWindowEnd).toISOString() : null,
+        maintenance_window_tz: editWindowStart ? editWindowTz : null,
       });
       setEditingDetails(false);
       await loadAll();
@@ -1055,6 +1106,29 @@ export default function ChangeDetailPage() {
                   )}
                 </div>
               )}
+              {change.maintenance_window_start && change.maintenance_window_end && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
+                  <span>🕐</span>
+                  <span>
+                    {new Date(change.maintenance_window_start).toLocaleString("en-GB", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZone: change.maintenance_window_tz || "UTC",
+                    })}
+                    {" – "}
+                    {new Date(change.maintenance_window_end).toLocaleString("en-GB", {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      timeZone: change.maintenance_window_tz || "UTC",
+                    })}
+                    {" "}
+                    {change.maintenance_window_tz || "UTC"}
+                  </span>
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <UserSwitcher />
@@ -1092,7 +1166,7 @@ export default function ChangeDetailPage() {
               {isAuthor && transitions.map((t) => (
                 <button
                   key={t.target}
-                  onClick={() => handleTransition(t.target)}
+                  onClick={() => handleTransitionClick(t.target)}
                   disabled={transitioning || t.disabled}
                   title={t.hint}
                   className={`px-4 py-1.5 text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${t.style}`}
@@ -1133,6 +1207,41 @@ export default function ChangeDetailPage() {
                   setShowAbort(false);
                   setAbortReason("");
                 }}
+                className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Out-of-window warning */}
+        {showWindowWarning && (
+          <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <span className="text-amber-600 text-lg flex-shrink-0">⚠️</span>
+              <div>
+                <h2 className="text-sm font-medium text-amber-900">
+                  Executing outside maintenance window
+                </h2>
+                <p className="mt-1 text-sm text-amber-800">
+                  {windowWarningMessage}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowWindowWarning(false);
+                  handleTransition("executing");
+                }}
+                disabled={transitioning}
+                className="px-4 py-1.5 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 disabled:opacity-50"
+              >
+                {transitioning ? "Starting..." : "Proceed Anyway"}
+              </button>
+              <button
+                onClick={() => setShowWindowWarning(false)}
                 className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
               >
                 Cancel
@@ -1259,6 +1368,41 @@ export default function ChangeDetailPage() {
                 itemNoun="environment"
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-2">Maintenance Window</label>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Start</label>
+                  <input
+                    type="datetime-local"
+                    value={editWindowStart}
+                    onChange={(e) => setEditWindowStart(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">End</label>
+                  <input
+                    type="datetime-local"
+                    value={editWindowEnd}
+                    onChange={(e) => setEditWindowEnd(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Timezone</label>
+                  <select
+                    value={editWindowTz}
+                    onChange={(e) => setEditWindowTz(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
+                  >
+                    {["UTC", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Copenhagen", "US/Eastern", "US/Central", "US/Mountain", "US/Pacific", "Asia/Tokyo", "Asia/Singapore", "Australia/Sydney"].map((tz) => (
+                      <option key={tz} value={tz}>{tz}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={handleSaveDetails}
@@ -1294,6 +1438,37 @@ export default function ChangeDetailPage() {
                 {tag}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Maintenance window banner — visible during execution */}
+        {isExecuting && change.maintenance_window_start && change.maintenance_window_end && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
+            <span className="text-blue-600 text-lg">🕐</span>
+            <div>
+              <span className="text-sm font-medium text-blue-900">
+                Window:{" "}
+                {new Date(change.maintenance_window_start).toLocaleString("en-GB", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  timeZone: change.maintenance_window_tz || "UTC",
+                })}
+                {" – "}
+                {new Date(change.maintenance_window_end).toLocaleString("en-GB", {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  timeZone: change.maintenance_window_tz || "UTC",
+                })}
+                {" "}
+                {change.maintenance_window_tz || "UTC"}
+              </span>
+            </div>
           </div>
         )}
 

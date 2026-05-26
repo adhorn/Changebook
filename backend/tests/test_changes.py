@@ -271,3 +271,77 @@ def test_health(client):
     resp = client.get("/health")
     assert resp.status_code == 200
     assert resp.json()["status"] == "ok"
+
+
+class TestMaintenanceWindow:
+    """Structured maintenance window fields on changes."""
+
+    def test_create_with_maintenance_window(self, client, sample_change_data):
+        resp = client.post(
+            "/api/v1/changes",
+            json={
+                "title": "Scheduled change",
+                **sample_change_data,
+                "maintenance_window_start": "2026-05-24T22:00:00Z",
+                "maintenance_window_end": "2026-05-25T02:00:00Z",
+                "maintenance_window_tz": "Europe/London",
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["maintenance_window_start"] is not None
+        assert data["maintenance_window_end"] is not None
+        assert data["maintenance_window_tz"] == "Europe/London"
+
+    def test_create_without_maintenance_window(self, client, sample_change_data):
+        resp = client.post(
+            "/api/v1/changes",
+            json={"title": "No window", **sample_change_data},
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["maintenance_window_start"] is None
+        assert data["maintenance_window_end"] is None
+        assert data["maintenance_window_tz"] is None
+
+    def test_end_must_be_after_start(self, client, sample_change_data):
+        resp = client.post(
+            "/api/v1/changes",
+            json={
+                "title": "Bad window",
+                **sample_change_data,
+                "maintenance_window_start": "2026-05-25T02:00:00Z",
+                "maintenance_window_end": "2026-05-24T22:00:00Z",
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_start_without_end_rejected(self, client, sample_change_data):
+        resp = client.post(
+            "/api/v1/changes",
+            json={
+                "title": "Missing end",
+                **sample_change_data,
+                "maintenance_window_start": "2026-05-24T22:00:00Z",
+            },
+        )
+        assert resp.status_code == 422
+
+    def test_patch_maintenance_window(self, client, sample_change_data):
+        create = client.post(
+            "/api/v1/changes",
+            json={"title": "Will add window later", **sample_change_data},
+        )
+        change_id = create.json()["id"]
+
+        resp = client.patch(
+            f"/api/v1/changes/{change_id}",
+            json={
+                "maintenance_window_start": "2026-06-01T18:00:00Z",
+                "maintenance_window_end": "2026-06-01T22:00:00Z",
+                "maintenance_window_tz": "US/Eastern",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["maintenance_window_tz"] == "US/Eastern"
