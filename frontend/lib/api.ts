@@ -275,7 +275,16 @@ export const api = {
   // Customers
   listCustomers: () => request<Customer[]>("/customers"),
   getCustomer: (id: string) => request<Customer>(`/customers/${id}`),
+  createCustomer: (data: { name: string; description?: string; services?: { name: string; description?: string }[] }) =>
+    request<Customer>("/customers", { method: "POST", body: JSON.stringify(data) }),
+  addService: (customerId: string, data: { name: string; description?: string }) =>
+    request<Service>(`/customers/${customerId}/services`, { method: "POST", body: JSON.stringify(data) }),
 
   // Environments
   listEnvironments: () => request<Environment[]>("/environments"),
+  createEnvironment: (data: { name: string; platform?: string; description?: string }) =>
+    request<Environment>("/environments", { method: "POST", body: JSON.stringify(data) }),
+
+  // People (known names from activity)
+  listPeople: () => request<string[]>("/people"),
 };

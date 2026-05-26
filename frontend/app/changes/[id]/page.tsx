@@ -750,12 +750,25 @@ export default function ChangeDetailPage() {
 
   const [reviewerName, setReviewerName] = useState("");
   const [addingReviewer, setAddingReviewer] = useState(false);
+  const [knownPeople, setKnownPeople] = useState<string[]>([]);
+  const [showPeopleSuggestions, setShowPeopleSuggestions] = useState(false);
+
+  async function openReviewerInput() {
+    setAddingReviewer(true);
+    try {
+      const people = await api.listPeople();
+      setKnownPeople(people);
+    } catch {
+      // non-critical — just means no suggestions
+    }
+  }
 
   async function handleAddReviewer(name?: string) {
     try {
       await api.assignReviewer(id, name?.trim() || undefined);
       setReviewerName("");
       setAddingReviewer(false);
+      setShowPeopleSuggestions(false);
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to add reviewer");
@@ -1594,7 +1607,7 @@ export default function ChangeDetailPage() {
         </div>
 
         {/* Reviews */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
+        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4 overflow-visible">
           <h2 className="text-lg font-medium text-gray-900">Reviews</h2>
 
           {reviews.length === 0 ? (
@@ -1625,38 +1638,69 @@ export default function ChangeDetailPage() {
             <>
               {!addingReviewer ? (
                 <button
-                  onClick={() => setAddingReviewer(true)}
+                  onClick={openReviewerInput}
                   className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
                   + Assign reviewer
                 </button>
               ) : (
-                <div className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={reviewerName}
-                    onChange={(e) => setReviewerName(e.target.value)}
-                    placeholder="Reviewer name..."
-                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && reviewerName.trim()) handleAddReviewer(reviewerName);
-                      if (e.key === "Escape") { setAddingReviewer(false); setReviewerName(""); }
-                    }}
-                    autoFocus
-                  />
-                  <button
-                    onClick={() => handleAddReviewer(reviewerName)}
-                    disabled={!reviewerName.trim()}
-                    className="px-3 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    Assign
-                  </button>
-                  <button
-                    onClick={() => { setAddingReviewer(false); setReviewerName(""); }}
-                    className="px-2 py-1.5 text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    Cancel
-                  </button>
+                <div className="relative">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={reviewerName}
+                      onChange={(e) => {
+                        setReviewerName(e.target.value);
+                        setShowPeopleSuggestions(true);
+                      }}
+                      onFocus={() => setShowPeopleSuggestions(true)}
+                      placeholder="Reviewer name..."
+                      className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && reviewerName.trim()) handleAddReviewer(reviewerName);
+                        if (e.key === "Escape") { setAddingReviewer(false); setReviewerName(""); setShowPeopleSuggestions(false); }
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleAddReviewer(reviewerName)}
+                      disabled={!reviewerName.trim()}
+                      className="px-3 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
+                    >
+                      Assign
+                    </button>
+                    <button
+                      onClick={() => { setAddingReviewer(false); setReviewerName(""); setShowPeopleSuggestions(false); }}
+                      className="px-2 py-1.5 text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {/* People suggestions dropdown */}
+                  {showPeopleSuggestions && (() => {
+                    const assigned = reviews.map((r) => r.reviewer_name);
+                    const filtered = knownPeople.filter((p) => {
+                      if (assigned.includes(p)) return false;
+                      if (change && p === change.author_name) return false;
+                      if (reviewerName && !p.toLowerCase().includes(reviewerName.toLowerCase())) return false;
+                      return true;
+                    });
+                    if (filtered.length === 0) return null;
+                    return (
+                      <div className="absolute z-50 mt-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {filtered.map((person) => (
+                          <button
+                            key={person}
+                            type="button"
+                            onClick={() => handleAddReviewer(person)}
+                            className="w-full px-3 py-2 text-sm text-left hover:bg-gray-50"
+                          >
+                            {person}
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </>

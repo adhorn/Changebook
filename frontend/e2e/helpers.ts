@@ -58,6 +58,17 @@ export async function switchUser(page: Page, user: { email: string; name: string
   }, user);
 }
 
+/** Pick the first option from a SearchableSelect combobox by its label text. */
+export async function pickFirstOption(page: Page, labelText: string) {
+  // Find the label, then its parent container, then the trigger button
+  const label = page.locator(`label`, { hasText: labelText }).first();
+  const container = label.locator("..");
+  // Click the trigger button to open the dropdown
+  await container.locator("button").first().click();
+  // Click the first option in the dropdown list
+  await container.locator("[class*='absolute'] [class*='overflow-y'] button").first().click();
+}
+
 export const USERS = {
   alice: { email: "alice@changebook.dev", name: "Alice Engineer", role: "Author" },
   bob: { email: "bob@changebook.dev", name: "Bob Reviewer", role: "Reviewer" },
