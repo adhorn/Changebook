@@ -681,6 +681,7 @@ export default function ChangeDetailPage() {
   const [duplicating, setDuplicating] = useState(false);
   const [showWindowWarning, setShowWindowWarning] = useState(false);
   const [windowWarningMessage, setWindowWarningMessage] = useState("");
+  const [windowOverrideReason, setWindowOverrideReason] = useState("");
 
   // Inline editing for draft details (title, description, customer/service/environment)
   const [editingDetails, setEditingDetails] = useState(false);
@@ -1120,6 +1121,9 @@ export default function ChangeDetailPage() {
                     })}
                     {" – "}
                     {new Date(change.maintenance_window_end).toLocaleString("en-GB", {
+                      weekday: "short",
+                      day: "numeric",
+                      month: "short",
                       hour: "2-digit",
                       minute: "2-digit",
                       timeZone: change.maintenance_window_tz || "UTC",
@@ -1229,19 +1233,36 @@ export default function ChangeDetailPage() {
                 </p>
               </div>
             </div>
+            <div>
+              <label className="block text-xs font-medium text-amber-900 mb-1">
+                Why are you proceeding outside the window? *
+              </label>
+              <textarea
+                value={windowOverrideReason}
+                onChange={(e) => setWindowOverrideReason(e.target.value)}
+                rows={2}
+                placeholder="e.g., Customer approved early start due to severity of issue"
+                className="w-full px-3 py-2 border border-amber-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-amber-500"
+                autoFocus
+              />
+            </div>
             <div className="flex gap-2">
               <button
                 onClick={() => {
                   setShowWindowWarning(false);
-                  handleTransition("executing");
+                  handleTransition("executing", windowOverrideReason.trim());
+                  setWindowOverrideReason("");
                 }}
-                disabled={transitioning}
+                disabled={transitioning || !windowOverrideReason.trim()}
                 className="px-4 py-1.5 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 disabled:opacity-50"
               >
                 {transitioning ? "Starting..." : "Proceed Anyway"}
               </button>
               <button
-                onClick={() => setShowWindowWarning(false)}
+                onClick={() => {
+                  setShowWindowWarning(false);
+                  setWindowOverrideReason("");
+                }}
                 className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
               >
                 Cancel

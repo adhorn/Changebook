@@ -284,29 +284,35 @@ def transition_status(
     if new_status == ChangeStatus.EXECUTING:
         now = datetime.now(UTC)
         if change.maintenance_window_start and now < change.maintenance_window_start:
+            window_data: dict = {
+                "window_start": change.maintenance_window_start.isoformat(),
+                "executed_at": now.isoformat(),
+            }
+            if reason:
+                window_data["operator_reason"] = reason
             db.add(
                 AuditEvent(
                     change_id=change.id,
                     event_type="window_warning",
                     actor_name=actor_name,
                     description="Execution started before maintenance window opens.",
-                    event_data={
-                        "window_start": change.maintenance_window_start.isoformat(),
-                        "executed_at": now.isoformat(),
-                    },
+                    event_data=window_data,
                 )
             )
         elif change.maintenance_window_end and now > change.maintenance_window_end:
+            window_data = {
+                "window_end": change.maintenance_window_end.isoformat(),
+                "executed_at": now.isoformat(),
+            }
+            if reason:
+                window_data["operator_reason"] = reason
             db.add(
                 AuditEvent(
                     change_id=change.id,
                     event_type="window_warning",
                     actor_name=actor_name,
                     description="Execution started after maintenance window closed.",
-                    event_data={
-                        "window_end": change.maintenance_window_end.isoformat(),
-                        "executed_at": now.isoformat(),
-                    },
+                    event_data=window_data,
                 )
             )
 
