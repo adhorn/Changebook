@@ -355,12 +355,12 @@ function ChecklistItemRow({
               <CopyButton text={item.command} />
             </div>
           )}
-          {item.expected_outcome && (
+          {item.expected_outcome && !showComplete && (
             <p className="mt-1 text-xs text-gray-500">
               Expected: {item.expected_outcome}
             </p>
           )}
-          {item.rollback_action && (
+          {item.rollback_action && !showComplete && (
             <p className="mt-1 text-xs text-gray-500">
               Rollback: {item.rollback_action}
             </p>
@@ -476,9 +476,30 @@ function ChecklistItemRow({
                 </button>
               ) : (
                 <div className="mt-3 space-y-2 p-3 bg-white border border-blue-200 rounded-lg">
+                  {/* Surface expected outcome prominently when recording */}
+                  {item.expected_outcome && (
+                    <div className="p-2.5 bg-blue-50 border border-blue-100 rounded-md">
+                      <p className="text-xs font-medium text-blue-800 mb-0.5">
+                        What you should see
+                      </p>
+                      <p className="text-sm text-blue-900 whitespace-pre-wrap">
+                        {item.expected_outcome}
+                      </p>
+                    </div>
+                  )}
+                  {item.rollback_action && (
+                    <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-md">
+                      <p className="text-xs font-medium text-gray-500 mb-0.5">
+                        If this doesn&apos;t look right
+                      </p>
+                      <p className="text-xs text-gray-700 whitespace-pre-wrap">
+                        {item.rollback_action}
+                      </p>
+                    </div>
+                  )}
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Result — paste output or describe what you observed *
+                      What did you observe? *
                     </label>
                     <textarea
                       value={observedResult}
