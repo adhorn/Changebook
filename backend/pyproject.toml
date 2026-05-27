@@ -48,6 +48,8 @@ select = ["E", "F", "I", "N", "W", "UP"]
 "app/models/preflight.py" = ["E501"]
 # Realistic test data contains long strings (commands, descriptions, outputs)
 "tests/test_realistic_content.py" = ["E501"]
+# Seed data contains long shell commands and expected outcomes
+"seed.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
