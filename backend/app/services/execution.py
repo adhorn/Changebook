@@ -7,6 +7,7 @@ Enforces:
 - Only works when the change is in 'executing' status
 """
 
+import logging
 import uuid
 from datetime import UTC, datetime
 
@@ -20,6 +21,8 @@ from app.models.checklist import (
     ChecklistPhase,
     CompletionStatus,
 )
+
+logger = logging.getLogger(__name__)
 
 # Logical phase order — must match the PHASE_ORDER in changes service
 PHASE_SEQUENCE = [
@@ -159,6 +162,19 @@ def complete_item(
     db.add(audit)
     db.commit()
     db.refresh(completion)
+    logger.info(
+        "Item completed: %s [%s/%d] — %s",
+        item.description,
+        item.phase.value,
+        item.order,
+        status.value,
+        extra={
+            "change_id": str(change.id),
+            "actor": completed_by,
+            "action": "item_completed",
+            "detail": f"phase={item.phase.value} order={item.order} status={status.value}",
+        },
+    )
     return completion
 
 
@@ -214,6 +230,18 @@ def verify_hold_point(
     db.add(audit)
     db.commit()
     db.refresh(completion)
+    logger.info(
+        "Hold point verified: %s [%s/%d]",
+        item.description,
+        item.phase.value,
+        item.order,
+        extra={
+            "change_id": str(change.id),
+            "actor": verified_by,
+            "action": "hold_point_verified",
+            "detail": f"phase={item.phase.value} order={item.order}",
+        },
+    )
     return completion
 
 

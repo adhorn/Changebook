@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -8,6 +9,8 @@ from app.models.change import Change, ChangeStatus
 from app.models.checklist import ChecklistItem, ChecklistPhase
 from app.models.preflight import PREFLIGHT_SCHEMA_VERSION, validate_preflight_completeness
 from app.models.review import Review, ReviewDecision
+
+logger = logging.getLogger(__name__)
 
 STALENESS_THRESHOLD = timedelta(hours=24)
 
@@ -31,6 +34,10 @@ def create_change(db: Session, data: dict) -> Change:
     db.add(audit)
     db.commit()
     db.refresh(change)
+    logger.info(
+        "Change created",
+        extra={"change_id": str(change.id), "actor": change.author_name, "action": "create"},
+    )
     return change
 
 
@@ -140,6 +147,15 @@ def update_change(db: Session, change: Change, data: dict, actor_name: str) -> C
     db.add(audit)
     db.commit()
     db.refresh(change)
+    logger.info(
+        "Change updated",
+        extra={
+            "change_id": str(change.id),
+            "actor": actor_name,
+            "action": "update",
+            "detail": ",".join(data.keys()),
+        },
+    )
     return change
 
 
@@ -207,6 +223,15 @@ def duplicate_change(db: Session, source: Change, overrides: dict, author_name: 
     db.add(audit)
     db.commit()
     db.refresh(clone)
+    logger.info(
+        "Change duplicated",
+        extra={
+            "change_id": str(clone.id),
+            "actor": author_name,
+            "action": "duplicate",
+            "detail": f"source={source.id}",
+        },
+    )
     return clone
 
 
@@ -218,6 +243,17 @@ def transition_status(
     reason: str | None = None,
 ) -> Change:
     old_status = change.status
+    logger.info(
+        "Transition requested: %s -> %s",
+        old_status.value,
+        new_status.value,
+        extra={
+            "change_id": str(change.id),
+            "actor": actor_name,
+            "action": "transition_request",
+            "detail": f"{old_status.value}->{new_status.value}",
+        },
+    )
     _validate_transition(old_status, new_status)
 
     # Gates on transition to in_review
@@ -225,6 +261,15 @@ def transition_status(
         # Gate 1: all required change profile answers must be filled
         missing_answers = validate_preflight_completeness(change.preflight_answers)
         if missing_answers:
+            logger.warning(
+                "Gate rejected: incomplete change profile",
+                extra={
+                    "change_id": str(change.id),
+                    "actor": actor_name,
+                    "action": "gate_rejected",
+                    "detail": f"missing_answers={missing_answers}",
+                },
+            )
             raise ValueError(
                 f"Cannot submit for review — incomplete change profile. Missing: {missing_answers}"
             )
@@ -244,6 +289,15 @@ def transition_status(
         }
         missing_phases = required_phases - phases_with_items
         if missing_phases:
+            logger.warning(
+                "Gate rejected: missing checklist phases",
+                extra={
+                    "change_id": str(change.id),
+                    "actor": actor_name,
+                    "action": "gate_rejected",
+                    "detail": f"missing_phases={sorted(p.value for p in missing_phases)}",
+                },
+            )
             raise ValueError(
                 f"Cannot submit for review — checklist items required in all "
                 f"three phases. Missing: {sorted(p.value for p in missing_phases)}"
@@ -253,12 +307,30 @@ def transition_status(
     if new_status == ChangeStatus.APPROVED:
         reviews = db.query(Review).filter(Review.change_id == change.id).all()
         if not reviews:
+            logger.warning(
+                "Gate rejected: no reviewers assigned",
+                extra={
+                    "change_id": str(change.id),
+                    "actor": actor_name,
+                    "action": "gate_rejected",
+                    "detail": "no_reviewers",
+                },
+            )
             raise ValueError(
                 "Cannot approve — no reviewers assigned. At least one reviewer must approve."
             )
         non_approved = [r for r in reviews if r.decision != ReviewDecision.APPROVED]
         if non_approved:
             pending_names = [r.reviewer_name for r in non_approved]
+            logger.warning(
+                "Gate rejected: outstanding reviews",
+                extra={
+                    "change_id": str(change.id),
+                    "actor": actor_name,
+                    "action": "gate_rejected",
+                    "detail": f"outstanding={pending_names}",
+                },
+            )
             raise ValueError(
                 f"Cannot approve — not all reviewers have approved. Outstanding: {pending_names}"
             )
@@ -379,6 +451,17 @@ def transition_status(
     db.add(audit)
     db.commit()
     db.refresh(change)
+    logger.info(
+        "Transition complete: %s -> %s",
+        old_status.value,
+        new_status.value,
+        extra={
+            "change_id": str(change.id),
+            "actor": actor_name,
+            "action": "transition",
+            "detail": f"{old_status.value}->{new_status.value}",
+        },
+    )
     return change
 
 
@@ -533,6 +616,15 @@ def _invalidate_reviews_if_any(db: Session, change_id: uuid.UUID) -> None:
             review.comment = None
             changed = True
     if changed:
+        logger.info(
+            "Reviews invalidated — change edited after review",
+            extra={
+                "change_id": str(change_id),
+                "actor": "system",
+                "action": "reviews_invalidated",
+                "detail": ",".join(r.reviewer_name for r in reviews),
+            },
+        )
         audit = AuditEvent(
             change_id=change_id,
             event_type="reviews_invalidated",

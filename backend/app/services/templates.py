@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from sqlalchemy.orm import Session
@@ -5,6 +6,8 @@ from sqlalchemy.orm import Session
 from app.models.change import Change, ChangeStatus
 from app.models.checklist import ChecklistItem
 from app.models.template import ChangeTemplate, TemplateChecklistItem
+
+logger = logging.getLogger(__name__)
 
 # Preflight keys that describe the procedure (reusable across contexts).
 # Customer-specific and timing-specific keys are excluded from templates.
@@ -45,6 +48,11 @@ def create_template(db: Session, data: dict, author_name: str) -> ChangeTemplate
 
     db.commit()
     db.refresh(template)
+    logger.info(
+        "Template created: %s",
+        template.title,
+        extra={"actor": author_name, "action": "template_created"},
+    )
     return template
 
 
@@ -90,6 +98,14 @@ def save_change_as_template(
 
     db.commit()
     db.refresh(template)
+    logger.info(
+        "Template saved from change",
+        extra={
+            "change_id": str(change.id),
+            "actor": author_name,
+            "action": "template_from_change",
+        },
+    )
     return template
 
 
@@ -134,6 +150,15 @@ def create_change_from_template(
 
     db.commit()
     db.refresh(change)
+    logger.info(
+        "Change created from template",
+        extra={
+            "change_id": str(change.id),
+            "actor": author_name,
+            "action": "change_from_template",
+            "detail": f"template={template.id}",
+        },
+    )
     return change
 
 
