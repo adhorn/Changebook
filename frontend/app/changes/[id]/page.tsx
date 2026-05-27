@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
-import UserSwitcher from "@/components/UserSwitcher";
 import SearchableSelect from "@/components/SearchableSelect";
-import ChecklistItemRow from "@/components/ChecklistItemRow";
-import ReviewCard from "@/components/ReviewCard";
+import ChangeHeader from "@/components/changes/ChangeHeader";
+import PreflightProfile from "@/components/changes/PreflightProfile";
+import ChecklistSection from "@/components/changes/ChecklistSection";
+import ReviewsSection from "@/components/changes/ReviewsSection";
 import { getCurrentUser } from "@/lib/auth";
 import {
   api,
@@ -20,12 +20,8 @@ import {
   Environment,
 } from "@/lib/api";
 import {
-  STATUS_COLORS,
-  STATUS_LABELS,
   PHASE_LABELS,
-  PHASE_ORDER,
   TIMEZONES,
-  formatDate,
 } from "@/lib/constants";
 
 // --- Main Page ---
@@ -59,20 +55,18 @@ export default function ChangeDetailPage() {
   const [transitioning, setTransitioning] = useState(false);
   const [showAbort, setShowAbort] = useState(false);
   const [abortReason, setAbortReason] = useState("");
-  // Reviewer identity comes from auth headers
   const [preflightExpanded, setPreflightExpanded] = useState(false);
   const [preflightEditing, setPreflightEditing] = useState(false);
   const [editedAnswers, setEditedAnswers] = useState<Record<string, string>>({});
   const [savingPreflight, setSavingPreflight] = useState(false);
   const [showDuplicate, setShowDuplicate] = useState(false);
-  // Duplicate author comes from auth headers
   const [dupTitle, setDupTitle] = useState("");
   const [duplicating, setDuplicating] = useState(false);
   const [showWindowWarning, setShowWindowWarning] = useState(false);
   const [windowWarningMessage, setWindowWarningMessage] = useState("");
   const [windowOverrideReason, setWindowOverrideReason] = useState("");
 
-  // Inline editing for draft details (title, description, customer/service/environment)
+  // Inline editing for draft details
   const [editingDetails, setEditingDetails] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
@@ -93,6 +87,15 @@ export default function ChangeDetailPage() {
   const [newItemExpectedOutcome, setNewItemExpectedOutcome] = useState("");
   const [newItemRollbackAction, setNewItemRollbackAction] = useState("");
   const [newItemHoldPoint, setNewItemHoldPoint] = useState(false);
+
+  // Reviewer state
+  const [addingReviewer, setAddingReviewer] = useState(false);
+  const [knownPeople, setKnownPeople] = useState<string[]>([]);
+
+  // Template state
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [templateTitle, setTemplateTitle] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
 
   const loadAll = useCallback(async () => {
     try {
@@ -128,6 +131,8 @@ export default function ChangeDetailPage() {
       preflightLabelMap[q.key] = q.label;
     }
   }
+
+  // --- Handlers ---
 
   async function handleTransition(target: ChangeStatus, reason?: string) {
     if (!change) return;
@@ -178,9 +183,6 @@ export default function ChangeDetailPage() {
     handleTransition(target);
   }
 
-  const [addingReviewer, setAddingReviewer] = useState(false);
-  const [knownPeople, setKnownPeople] = useState<string[]>([]);
-
   async function openReviewerInput() {
     setAddingReviewer(true);
     try {
@@ -226,7 +228,6 @@ export default function ChangeDetailPage() {
       setNewItemExpectedOutcome("");
       setNewItemRollbackAction("");
       setNewItemHoldPoint(false);
-      // Keep the form open in the same phase so you can add multiple items
       await loadAll();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -235,7 +236,6 @@ export default function ChangeDetailPage() {
 
   function toLocalInput(isoStr: string | null): string {
     if (!isoStr) return "";
-    // datetime-local inputs need "YYYY-MM-DDTHH:MM" format
     return isoStr.slice(0, 16);
   }
 
@@ -250,7 +250,6 @@ export default function ChangeDetailPage() {
     setEditWindowEnd(toLocalInput(change.maintenance_window_end));
     setEditWindowTz(change.maintenance_window_tz || "UTC");
     setEditingDetails(true);
-    // Load customers/environments for dropdowns
     api.listCustomers().then(setCustomers).catch(console.error);
     api.listEnvironments().then(setEnvironments).catch(console.error);
   }
@@ -349,10 +348,6 @@ export default function ChangeDetailPage() {
     }
   }
 
-  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
-  const [templateTitle, setTemplateTitle] = useState("");
-  const [savingTemplate, setSavingTemplate] = useState(false);
-
   async function handleSaveAsTemplate() {
     setSavingTemplate(true);
     setError(null);
@@ -362,7 +357,6 @@ export default function ChangeDetailPage() {
       });
       setShowSaveTemplate(false);
       setTemplateTitle("");
-      // Brief success feedback
       setError(null);
       alert("Template saved to the library.");
     } catch (err: unknown) {
@@ -389,6 +383,8 @@ export default function ChangeDetailPage() {
     }
   }
 
+  // --- Loading and error states ---
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500">
@@ -407,45 +403,23 @@ export default function ChangeDetailPage() {
     );
   }
 
+  // --- Derived state ---
+
   const isExecuting = change.status === "executing";
   const isDraft = change.status === "draft";
   const isTerminal = change.status === "done" || change.status === "aborted";
   const isAuthor = currentUserName === change.author_name;
   const canEdit = isDraft && isAuthor;
 
-  // Group checklist by phase
-  const checklistByPhase: Record<string, ChecklistItem[]> = {};
-  for (const item of checklist) {
-    if (!checklistByPhase[item.phase]) checklistByPhase[item.phase] = [];
-    checklistByPhase[item.phase].push(item);
-  }
-
   // Determine available transitions
-  const transitions: { label: string; target: ChangeStatus; style: string; disabled?: boolean; hint?: string }[] =
-    [];
+  const transitions: { label: string; target: ChangeStatus; style: string; disabled?: boolean; hint?: string }[] = [];
   if (change.status === "draft") {
-    transitions.push({
-      label: "Submit for Review",
-      target: "in_review",
-      style: "bg-gray-900 text-white hover:bg-gray-800",
-    });
+    transitions.push({ label: "Submit for Review", target: "in_review", style: "bg-gray-900 text-white hover:bg-gray-800" });
   } else if (change.status === "in_review") {
-    transitions.push({
-      label: "Approve",
-      target: "approved",
-      style: "bg-blue-600 text-white hover:bg-blue-700",
-    });
-    transitions.push({
-      label: "Back to Draft",
-      target: "draft",
-      style: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50",
-    });
+    transitions.push({ label: "Approve", target: "approved", style: "bg-blue-600 text-white hover:bg-blue-700" });
+    transitions.push({ label: "Back to Draft", target: "draft", style: "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50" });
   } else if (change.status === "approved") {
-    transitions.push({
-      label: "Start Execution",
-      target: "executing",
-      style: "bg-orange-600 text-white hover:bg-orange-700",
-    });
+    transitions.push({ label: "Start Execution", target: "executing", style: "bg-orange-600 text-white hover:bg-orange-700" });
   } else if (change.status === "executing") {
     const allComplete = execStatus?.all_complete ?? false;
     transitions.push({
@@ -457,159 +431,32 @@ export default function ChangeDetailPage() {
     });
   }
 
-  // Pre-flight: group answers by section
-  const hasPreflightAnswers =
-    change.preflight_answers &&
-    Object.keys(change.preflight_answers).length > 0;
-
-  const answeredCount = hasPreflightAnswers
-    ? Object.values(change.preflight_answers!).filter((v) => v && v.trim())
-        .length
-    : 0;
+  // --- Render ---
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-400 hover:text-gray-600">
-              &larr;
-            </Link>
-            <div className="flex-1">
-              <h1 className="text-xl font-semibold text-gray-900">
-                {change.title}
-              </h1>
-              <div className="flex items-center gap-3 mt-1">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[change.status]}`}
-                >
-                  {STATUS_LABELS[change.status]}
-                </span>
-                <span className="text-sm text-gray-500">
-                  by {change.author_name}
-                </span>
-                <span className="text-sm text-gray-400">
-                  {formatDate(change.created_at)}
-                </span>
-              </div>
-              {(change.customer_name || change.environment_name) && (
-                <div className="flex items-center gap-1.5 mt-1 text-sm text-gray-500">
-                  {change.customer_name && (
-                    <span>{change.customer_name}</span>
-                  )}
-                  {change.service_name && (
-                    <>
-                      <span className="text-gray-300">/</span>
-                      <span>{change.service_name}</span>
-                    </>
-                  )}
-                  {change.environment_name && (
-                    <>
-                      <span className="text-gray-300">→</span>
-                      <span className="font-medium text-gray-700">
-                        {change.environment_name}
-                      </span>
-                      {change.environment_platform && (
-                        <span className="text-xs text-gray-400">
-                          ({change.environment_platform})
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-              {change.maintenance_window_start && change.maintenance_window_end && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-0.5">
-                  <span>🕐</span>
-                  <span>
-                    {new Date(change.maintenance_window_start).toLocaleString("en-GB", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      timeZone: change.maintenance_window_tz || "UTC",
-                    })}
-                    {" – "}
-                    {new Date(change.maintenance_window_end).toLocaleString("en-GB", {
-                      weekday: "short",
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      timeZone: change.maintenance_window_tz || "UTC",
-                    })}
-                    {" "}
-                    {change.maintenance_window_tz || "UTC"}
-                  </span>
-                </div>
-              )}
-            </div>
-            <div className="flex items-center gap-3">
-              <UserSwitcher />
-              {canEdit && !editingDetails && (
-                <button
-                  onClick={startEditingDetails}
-                  className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Edit
-                </button>
-              )}
-              <button
-                onClick={handleExport}
-                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Export
-              </button>
-              <button
-                onClick={() => {
-                  setDupTitle(`${change.title} (copy)`);
-                  setShowDuplicate(true);
-                }}
-                className="px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Duplicate
-              </button>
-              <button
-                onClick={() => {
-                  setTemplateTitle(`${change.title}`);
-                  setShowSaveTemplate(true);
-                }}
-                className="px-3 py-1.5 text-xs font-medium text-indigo-600 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-50"
-              >
-                Save as Template
-              </button>
-              {!isTerminal && isAuthor && (
-                <button
-                  onClick={() => setShowAbort(!showAbort)}
-                  className="px-3 py-1.5 text-xs font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50"
-                >
-                  {showAbort ? "Cancel" : "Abort"}
-                </button>
-              )}
-              {isAuthor && transitions.map((t) => (
-                <button
-                  key={t.target}
-                  onClick={() => handleTransitionClick(t.target)}
-                  disabled={transitioning || t.disabled}
-                  title={t.hint}
-                  className={`px-4 py-1.5 text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed ${t.style}`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </header>
+      <ChangeHeader
+        change={change}
+        canEdit={canEdit}
+        isTerminal={isTerminal}
+        isAuthor={isAuthor}
+        editingDetails={editingDetails}
+        transitions={transitions}
+        transitioning={transitioning}
+        onStartEditingDetails={startEditingDetails}
+        onExport={handleExport}
+        onDuplicate={() => { setDupTitle(`${change.title} (copy)`); setShowDuplicate(true); }}
+        onSaveAsTemplate={() => { setTemplateTitle(change.title); setShowSaveTemplate(true); }}
+        onAbortToggle={() => setShowAbort(!showAbort)}
+        showAbort={showAbort}
+        onTransitionClick={handleTransitionClick}
+      />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         {/* Abort confirmation */}
         {showAbort && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 space-y-3">
-            <h2 className="text-sm font-medium text-red-900">
-              Abort this change
-            </h2>
+            <h2 className="text-sm font-medium text-red-900">Abort this change</h2>
             <textarea
               value={abortReason}
               onChange={(e) => setAbortReason(e.target.value)}
@@ -627,10 +474,7 @@ export default function ChangeDetailPage() {
                 {transitioning ? "Aborting..." : "Confirm Abort"}
               </button>
               <button
-                onClick={() => {
-                  setShowAbort(false);
-                  setAbortReason("");
-                }}
+                onClick={() => { setShowAbort(false); setAbortReason(""); }}
                 className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
               >
                 Cancel
@@ -645,18 +489,12 @@ export default function ChangeDetailPage() {
             <div className="flex items-start gap-3">
               <span className="text-amber-600 text-lg flex-shrink-0">⚠️</span>
               <div>
-                <h2 className="text-sm font-medium text-amber-900">
-                  Executing outside maintenance window
-                </h2>
-                <p className="mt-1 text-sm text-amber-800">
-                  {windowWarningMessage}
-                </p>
+                <h2 className="text-sm font-medium text-amber-900">Executing outside maintenance window</h2>
+                <p className="mt-1 text-sm text-amber-800">{windowWarningMessage}</p>
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-amber-900 mb-1">
-                Why are you proceeding outside the window? *
-              </label>
+              <label className="block text-xs font-medium text-amber-900 mb-1">Why are you proceeding outside the window? *</label>
               <textarea
                 value={windowOverrideReason}
                 onChange={(e) => setWindowOverrideReason(e.target.value)}
@@ -668,21 +506,14 @@ export default function ChangeDetailPage() {
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => {
-                  setShowWindowWarning(false);
-                  handleTransition("executing", windowOverrideReason.trim());
-                  setWindowOverrideReason("");
-                }}
+                onClick={() => { setShowWindowWarning(false); handleTransition("executing", windowOverrideReason.trim()); setWindowOverrideReason(""); }}
                 disabled={transitioning || !windowOverrideReason.trim()}
                 className="px-4 py-1.5 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 disabled:opacity-50"
               >
                 {transitioning ? "Starting..." : "Proceed Anyway"}
               </button>
               <button
-                onClick={() => {
-                  setShowWindowWarning(false);
-                  setWindowOverrideReason("");
-                }}
+                onClick={() => { setShowWindowWarning(false); setWindowOverrideReason(""); }}
                 className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
               >
                 Cancel
@@ -694,73 +525,40 @@ export default function ChangeDetailPage() {
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm">
             {error}
-            <button
-              onClick={() => setError(null)}
-              className="ml-2 underline"
-            >
-              dismiss
-            </button>
+            <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
           </div>
         )}
 
-        {/* Abort reason banner */}
+        {/* Status banners */}
         {change.status === "aborted" && change.abort_reason && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <h3 className="text-sm font-medium text-red-900">Abort reason</h3>
             <p className="mt-1 text-sm text-red-700 whitespace-pre-wrap">{change.abort_reason}</p>
           </div>
         )}
-
-        {/* Window override banner */}
         {change.window_override_reason && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-amber-900">
-              ⚠️ Executed outside maintenance window
-            </h3>
-            <p className="mt-1 text-sm text-amber-800 whitespace-pre-wrap">
-              {change.window_override_reason}
-            </p>
+            <h3 className="text-sm font-medium text-amber-900">⚠️ Executed outside maintenance window</h3>
+            <p className="mt-1 text-sm text-amber-800 whitespace-pre-wrap">{change.window_override_reason}</p>
           </div>
         )}
 
         {/* Duplicate form */}
         {showDuplicate && (
           <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-3">
-            <h2 className="text-sm font-medium text-gray-900">
-              Duplicate this change
-            </h2>
-            <p className="text-xs text-gray-500">
-              Creates a copy with the same change profile, checklist, and
-              defence tags. Status resets to Draft.
-            </p>
+            <h2 className="text-sm font-medium text-gray-900">Duplicate this change</h2>
+            <p className="text-xs text-gray-500">Creates a copy with the same change profile, checklist, and defence tags. Status resets to Draft.</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={dupTitle}
-                  onChange={(e) => setDupTitle(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-                />
+                <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                <input type="text" value={dupTitle} onChange={(e) => setDupTitle(e.target.value)} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900" />
               </div>
-              {/* Author comes from auth */}
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={handleDuplicate}
-                disabled={duplicating}
-                className="px-4 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
-              >
+              <button onClick={handleDuplicate} disabled={duplicating} className="px-4 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50">
                 {duplicating ? "Duplicating..." : "Create Duplicate"}
               </button>
-              <button
-                onClick={() => setShowDuplicate(false)}
-                className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
-              >
-                Cancel
-              </button>
+              <button onClick={() => setShowDuplicate(false)} className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800">Cancel</button>
             </div>
           </div>
         )}
@@ -768,149 +566,64 @@ export default function ChangeDetailPage() {
         {/* Save as template form */}
         {showSaveTemplate && (
           <div className="bg-white rounded-lg border border-indigo-200 p-6 space-y-3">
-            <h2 className="text-sm font-medium text-gray-900">
-              Save as Template
-            </h2>
-            <p className="text-xs text-gray-500">
-              Saves the checklist, defence tags, and change profile answers to the template library.
-              Customer, service, environment, and maintenance window are not included.
-            </p>
+            <h2 className="text-sm font-medium text-gray-900">Save as Template</h2>
+            <p className="text-xs text-gray-500">Saves the checklist, defence tags, and change profile answers to the template library. Customer, service, environment, and maintenance window are not included.</p>
             <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Template name
-              </label>
-              <input
-                type="text"
-                value={templateTitle}
-                onChange={(e) => setTemplateTitle(e.target.value)}
-                placeholder={`${change.title} (template)`}
-                className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                autoFocus
-              />
+              <label className="block text-xs font-medium text-gray-700 mb-1">Template name</label>
+              <input type="text" value={templateTitle} onChange={(e) => setTemplateTitle(e.target.value)} placeholder={`${change.title} (template)`} className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500" autoFocus />
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={handleSaveAsTemplate}
-                disabled={savingTemplate}
-                className="px-4 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-              >
+              <button onClick={handleSaveAsTemplate} disabled={savingTemplate} className="px-4 py-1.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
                 {savingTemplate ? "Saving..." : "Save Template"}
               </button>
-              <button
-                onClick={() => setShowSaveTemplate(false)}
-                className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
-              >
-                Cancel
-              </button>
+              <button onClick={() => setShowSaveTemplate(false)} className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800">Cancel</button>
             </div>
           </div>
         )}
 
-        {/* Inline editing for draft details */}
+        {/* Edit change details form */}
         {editingDetails && (
           <div className="bg-white rounded-lg border border-blue-200 p-6 space-y-4">
             <h2 className="text-sm font-medium text-gray-900">Edit Change Details</h2>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
-              <input
-                type="text"
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-              />
+              <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
-              <textarea
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-                rows={2}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-              />
+              <textarea value={editDescription} onChange={(e) => setEditDescription(e.target.value)} rows={2} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
             </div>
             <div className="grid grid-cols-1 gap-4">
-              <SearchableSelect
-                label="Customer"
-                required
-                options={customers.map((c) => ({ id: c.id, label: c.name }))}
-                value={editCustomerId}
-                onChange={(id) => { setEditCustomerId(id); setEditServiceId(""); }}
-                placeholder="Select customer..."
-                onCreateNew={handleCreateCustomer}
-                itemNoun="customer"
-              />
+              <SearchableSelect label="Customer" required options={customers.map((c) => ({ id: c.id, label: c.name }))} value={editCustomerId} onChange={(id) => { setEditCustomerId(id); setEditServiceId(""); }} placeholder="Select customer..." onCreateNew={handleCreateCustomer} itemNoun="customer" />
               {editCustomerId && (
-                <SearchableSelect
-                  label="Service"
-                  required
-                  options={(customers.find((c) => c.id === editCustomerId)?.services || []).map((s) => ({ id: s.id, label: s.name }))}
-                  value={editServiceId}
-                  onChange={setEditServiceId}
-                  placeholder="Select service..."
-                  onCreateNew={handleCreateService}
-                  itemNoun="service"
-                />
+                <SearchableSelect label="Service" required options={(customers.find((c) => c.id === editCustomerId)?.services || []).map((s) => ({ id: s.id, label: s.name }))} value={editServiceId} onChange={setEditServiceId} placeholder="Select service..." onCreateNew={handleCreateService} itemNoun="service" />
               )}
-              <SearchableSelect
-                label="Environment"
-                required
-                options={environments.map((e) => ({ id: e.id, label: e.name, sublabel: e.platform || undefined }))}
-                value={editEnvironmentId}
-                onChange={setEditEnvironmentId}
-                placeholder="Select environment..."
-                onCreateNew={handleCreateEnvironment}
-                itemNoun="environment"
-              />
+              <SearchableSelect label="Environment" required options={environments.map((e) => ({ id: e.id, label: e.name, sublabel: e.platform || undefined }))} value={editEnvironmentId} onChange={setEditEnvironmentId} placeholder="Select environment..." onCreateNew={handleCreateEnvironment} itemNoun="environment" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-700 mb-2">Maintenance Window</label>
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Start</label>
-                  <input
-                    type="datetime-local"
-                    value={editWindowStart}
-                    onChange={(e) => setEditWindowStart(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
+                  <input type="datetime-local" value={editWindowStart} onChange={(e) => setEditWindowStart(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">End</label>
-                  <input
-                    type="datetime-local"
-                    value={editWindowEnd}
-                    onChange={(e) => setEditWindowEnd(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  />
+                  <input type="datetime-local" value={editWindowEnd} onChange={(e) => setEditWindowEnd(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent" />
                 </div>
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">Timezone</label>
-                  <select
-                    value={editWindowTz}
-                    onChange={(e) => setEditWindowTz(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                  >
-                    {TIMEZONES.map((tz) => (
-                      <option key={tz} value={tz}>{tz}</option>
-                    ))}
+                  <select value={editWindowTz} onChange={(e) => setEditWindowTz(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent">
+                    {TIMEZONES.map((tz) => (<option key={tz} value={tz}>{tz}</option>))}
                   </select>
                 </div>
               </div>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={handleSaveDetails}
-                disabled={savingDetails || !editTitle.trim()}
-                className="px-4 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
-              >
+              <button onClick={handleSaveDetails} disabled={savingDetails || !editTitle.trim()} className="px-4 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50">
                 {savingDetails ? "Saving..." : "Save"}
               </button>
-              <button
-                onClick={() => setEditingDetails(false)}
-                className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
-              >
-                Cancel
-              </button>
+              <button onClick={() => setEditingDetails(false)} className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800">Cancel</button>
             </div>
           </div>
         )}
@@ -925,12 +638,7 @@ export default function ChangeDetailPage() {
         {change.defence_tags && change.defence_tags.length > 0 && (
           <div className="flex gap-2">
             {change.defence_tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200"
-              >
-                {tag}
-              </span>
+              <span key={tag} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-amber-50 text-amber-800 border border-amber-200">{tag}</span>
             ))}
           </div>
         )}
@@ -939,30 +647,13 @@ export default function ChangeDetailPage() {
         {isExecuting && change.maintenance_window_start && change.maintenance_window_end && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
             <span className="text-blue-600 text-lg">🕐</span>
-            <div>
-              <span className="text-sm font-medium text-blue-900">
-                Window:{" "}
-                {new Date(change.maintenance_window_start).toLocaleString("en-GB", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  timeZone: change.maintenance_window_tz || "UTC",
-                })}
-                {" – "}
-                {new Date(change.maintenance_window_end).toLocaleString("en-GB", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  timeZone: change.maintenance_window_tz || "UTC",
-                })}
-                {" "}
-                {change.maintenance_window_tz || "UTC"}
-              </span>
-            </div>
+            <span className="text-sm font-medium text-blue-900">
+              Window:{" "}
+              {new Date(change.maintenance_window_start).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: change.maintenance_window_tz || "UTC" })}
+              {" – "}
+              {new Date(change.maintenance_window_end).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: change.maintenance_window_tz || "UTC" })}
+              {" "}{change.maintenance_window_tz || "UTC"}
+            </span>
           </div>
         )}
 
@@ -970,405 +661,72 @@ export default function ChangeDetailPage() {
         {isExecuting && execStatus && (
           <div className="bg-white rounded-lg border border-orange-200 p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-900">
-                Execution Progress
-              </span>
-              <span className="text-sm text-gray-500">
-                {execStatus.completed_items} / {execStatus.total_items} items
-              </span>
+              <span className="text-sm font-medium text-gray-900">Execution Progress</span>
+              <span className="text-sm text-gray-500">{execStatus.completed_items} / {execStatus.total_items} items</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-orange-500 h-2 rounded-full transition-all"
-                style={{
-                  width: `${execStatus.total_items > 0 ? (execStatus.completed_items / execStatus.total_items) * 100 : 0}%`,
-                }}
-              />
+              <div className="bg-orange-500 h-2 rounded-full transition-all" style={{ width: `${execStatus.total_items > 0 ? (execStatus.completed_items / execStatus.total_items) * 100 : 0}%` }} />
             </div>
             {execStatus.current_phase && (
-              <p className="text-xs text-gray-500 mt-1">
-                Current phase:{" "}
-                {PHASE_LABELS[execStatus.current_phase] ||
-                  execStatus.current_phase}
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Current phase: {PHASE_LABELS[execStatus.current_phase] || execStatus.current_phase}</p>
             )}
           </div>
         )}
 
-        {/* Pre-flight answers — collapsible, grouped by section, editable in draft */}
-        {(hasPreflightAnswers || (isDraft && preflightSections.length > 0)) && (
-          <div className="bg-white rounded-lg border border-gray-200">
-            <div className="flex items-center justify-between p-6">
-              <button
-                onClick={() => setPreflightExpanded(!preflightExpanded)}
-                className="flex-1 flex items-center justify-between text-left hover:opacity-80 transition-opacity"
-              >
-                <div>
-                  <h2 className="text-lg font-medium text-gray-900">
-                    Change Profile
-                  </h2>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    {answeredCount} questions answered
-                  </p>
-                </div>
-                <span className="text-gray-400 text-lg">
-                  {preflightExpanded ? "▾" : "▸"}
-                </span>
-              </button>
-              {canEdit && !preflightEditing && (
-                <button
-                  onClick={startEditingPreflight}
-                  className="ml-4 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Edit
-                </button>
-              )}
-            </div>
+        {/* Change Profile */}
+        <PreflightProfile
+          change={change}
+          preflightSections={preflightSections}
+          preflightLabelMap={preflightLabelMap}
+          canEdit={canEdit}
+          preflightExpanded={preflightExpanded}
+          preflightEditing={preflightEditing}
+          editedAnswers={editedAnswers}
+          savingPreflight={savingPreflight}
+          onToggleExpanded={() => setPreflightExpanded(!preflightExpanded)}
+          onStartEditing={startEditingPreflight}
+          onCancelEditing={() => setPreflightEditing(false)}
+          onUpdateAnswer={updateEditedAnswer}
+          onSave={handleSavePreflight}
+        />
 
-            {preflightExpanded && !preflightEditing && (
-              <div className="px-6 pb-6 space-y-6 border-t border-gray-100 pt-4">
-                {preflightSections.map((section) => {
-                  const answeredQuestions = section.questions.filter(
-                    (q) => change.preflight_answers?.[q.key]
-                  );
-                  if (answeredQuestions.length === 0) return null;
-
-                  return (
-                    <div key={section.title}>
-                      <h3 className="text-sm font-medium text-gray-900 mb-2">
-                        {section.title}
-                      </h3>
-                      <dl className="space-y-2">
-                        {answeredQuestions.map((q) => (
-                          <div
-                            key={q.key}
-                            className="pl-3 border-l-2 border-gray-100"
-                          >
-                            <dt className="text-xs font-medium text-gray-500">
-                              {q.label}
-                            </dt>
-                            <dd className="mt-0.5 text-sm text-gray-900 whitespace-pre-wrap">
-                              {change.preflight_answers![q.key]}
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </div>
-                  );
-                })}
-
-                {/* Orphaned keys not in current schema */}
-                {(() => {
-                  const schemaKeys = new Set(
-                    preflightSections.flatMap((s) =>
-                      s.questions.map((q) => q.key)
-                    )
-                  );
-                  const orphanedEntries = Object.entries(
-                    change.preflight_answers || {}
-                  ).filter(([key]) => !schemaKeys.has(key));
-                  if (orphanedEntries.length === 0) return null;
-                  return (
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-900 mb-2">
-                        Other
-                      </h3>
-                      <dl className="space-y-2">
-                        {orphanedEntries.map(([key, value]) => (
-                          <div
-                            key={key}
-                            className="pl-3 border-l-2 border-gray-100"
-                          >
-                            <dt className="text-xs font-medium text-gray-500">
-                              {preflightLabelMap[key] ||
-                                key.replace(/_/g, " ")}
-                            </dt>
-                            <dd className="mt-0.5 text-sm text-gray-900 whitespace-pre-wrap">
-                              {value}
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
-            {/* Edit mode — show all questions as textareas */}
-            {preflightExpanded && preflightEditing && (
-              <div className="px-6 pb-6 space-y-6 border-t border-gray-100 pt-4">
-                {preflightSections.map((section) => (
-                  <div key={section.title}>
-                    <h3 className="text-sm font-medium text-gray-900 mb-1">
-                      {section.title}
-                    </h3>
-                    <p className="text-xs text-gray-400 italic mb-3">
-                      {section.framing}
-                    </p>
-                    <div className="space-y-3">
-                      {section.questions.map((q) => (
-                        <div key={q.key}>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">
-                            {q.label}
-                            {q.required && (
-                              <span className="text-red-500 ml-0.5">*</span>
-                            )}
-                          </label>
-                          <p className="text-xs text-gray-400 mb-1">
-                            {q.description}
-                          </p>
-                          <textarea
-                            value={editedAnswers[q.key] || ""}
-                            onChange={(e) =>
-                              updateEditedAnswer(q.key, e.target.value)
-                            }
-                            rows={2}
-                            placeholder={q.example}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-
-                <div className="flex gap-2 pt-2 border-t border-gray-100">
-                  <button
-                    onClick={handleSavePreflight}
-                    disabled={savingPreflight}
-                    className="px-4 py-1.5 text-sm font-medium text-white bg-gray-900 rounded-lg hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    {savingPreflight ? "Saving..." : "Save Answers"}
-                  </button>
-                  <button
-                    onClick={() => setPreflightEditing(false)}
-                    className="px-4 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Three-phase Checklist */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-6">
-          <h2 className="text-lg font-medium text-gray-900">Checklist</h2>
-
-          {PHASE_ORDER.map((phase) => {
-            const items = checklistByPhase[phase] || [];
-            if (items.length === 0 && !isDraft) return null;
-            const isAddingHere = addingToPhase === phase;
-
-            return (
-              <div key={phase}>
-                <h3 className="text-sm font-medium text-gray-700 mb-2 uppercase tracking-wider">
-                  {PHASE_LABELS[phase]}
-                  {execStatus?.phases?.[phase] && (
-                    <span className="ml-2 text-xs font-normal normal-case text-gray-400">
-                      ({execStatus.phases[phase].completed}/
-                      {execStatus.phases[phase].total})
-                    </span>
-                  )}
-                </h3>
-                {items.length === 0 && !isAddingHere ? (
-                  <p className="text-xs text-gray-400 italic">No items yet</p>
-                ) : (
-                  <div className="space-y-2">
-                    {items.map((item) => (
-                      <ChecklistItemRow
-                        key={item.id}
-                        item={item}
-                        isNext={execStatus?.next_item_id === item.id}
-                        isExecuting={isExecuting}
-                        isDraft={canEdit}
-                        changeId={id}
-                        currentUserName={currentUserName}
-                        onCompleted={loadAll}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                {/* Per-phase add form — appears below the last item */}
-                {canEdit && isAddingHere && (
-                  <div
-                    className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-200 space-y-2"
-                    ref={(el) => {
-                      if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                    }}
-                  >
-                    <input
-                      type="text"
-                      value={newItemDesc}
-                      onChange={(e) => setNewItemDesc(e.target.value)}
-                      placeholder="Description — what to do..."
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) handleAddChecklistItem(phase);
-                        if (e.key === "Escape") {
-                          setAddingToPhase(null);
-                          setNewItemDesc("");
-                          setNewItemCommand("");
-                          setNewItemExpectedOutcome("");
-                          setNewItemRollbackAction("");
-                          setNewItemHoldPoint(false);
-                        }
-                      }}
-                      autoFocus
-                    />
-                    <input
-                      type="text"
-                      value={newItemCommand}
-                      onChange={(e) => setNewItemCommand(e.target.value)}
-                      placeholder="Command (optional) — e.g. kubectl get pods -n prod"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-gray-900"
-                      style={{
-                        fontVariantLigatures: "none",
-                        fontFeatureSettings: '"liga" 0, "clig" 0',
-                        textRendering: "optimizeSpeed",
-                      }}
-                    />
-                    <input
-                      type="text"
-                      value={newItemExpectedOutcome}
-                      onChange={(e) => setNewItemExpectedOutcome(e.target.value)}
-                      placeholder="Expected outcome (optional) — what should you see?"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
-                    />
-                    <input
-                      type="text"
-                      value={newItemRollbackAction}
-                      onChange={(e) => setNewItemRollbackAction(e.target.value)}
-                      placeholder="Rollback action (optional) — what if this step fails?"
-                      className="w-full px-2 py-1.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-gray-900"
-                    />
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => handleAddChecklistItem(phase)}
-                        disabled={!newItemDesc.trim()}
-                        className="px-3 py-1.5 text-xs font-medium text-white bg-gray-900 rounded hover:bg-gray-800 disabled:opacity-50"
-                      >
-                        Add
-                      </button>
-                      <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={newItemHoldPoint}
-                          onChange={(e) => setNewItemHoldPoint(e.target.checked)}
-                          className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
-                        />
-                        🔒 Hold point
-                      </label>
-                      <button
-                        onClick={() => {
-                          setAddingToPhase(null);
-                          setNewItemDesc("");
-                          setNewItemCommand("");
-                          setNewItemExpectedOutcome("");
-                          setNewItemRollbackAction("");
-                          setNewItemHoldPoint(false);
-                        }}
-                        className="ml-auto px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
-                      >
-                        Done
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Add button at the bottom of each phase */}
-                {canEdit && !isAddingHere && (
-                  <button
-                    onClick={() => {
-                      setAddingToPhase(phase);
-                      setNewItemDesc("");
-                      setNewItemCommand("");
-                      setNewItemExpectedOutcome("");
-                      setNewItemRollbackAction("");
-                      setNewItemHoldPoint(false);
-                    }}
-                    className="mt-2 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
-                  >
-                    + Add item
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        {/* Checklist */}
+        <ChecklistSection
+          checklist={checklist}
+          execStatus={execStatus}
+          isExecuting={isExecuting}
+          canEdit={canEdit}
+          changeId={id}
+          currentUserName={currentUserName}
+          addingToPhase={addingToPhase}
+          newItemDesc={newItemDesc}
+          newItemCommand={newItemCommand}
+          newItemExpectedOutcome={newItemExpectedOutcome}
+          newItemRollbackAction={newItemRollbackAction}
+          newItemHoldPoint={newItemHoldPoint}
+          onSetAddingToPhase={setAddingToPhase}
+          onSetNewItemDesc={setNewItemDesc}
+          onSetNewItemCommand={setNewItemCommand}
+          onSetNewItemExpectedOutcome={setNewItemExpectedOutcome}
+          onSetNewItemRollbackAction={setNewItemRollbackAction}
+          onSetNewItemHoldPoint={setNewItemHoldPoint}
+          onAddItem={handleAddChecklistItem}
+          onReload={loadAll}
+        />
 
         {/* Reviews */}
-        <div className="bg-white rounded-lg border border-gray-200 p-6 space-y-4">
-          <h2 className="text-lg font-medium text-gray-900">Reviews</h2>
-
-          {reviews.length === 0 ? (
-            <p className="text-sm text-gray-500">
-              No reviewers assigned yet.
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {reviews.map((review) => (
-                <ReviewCard
-                  key={review.id}
-                  review={review}
-                  canDecide={
-                    review.decision === "pending" &&
-                    change.status === "in_review" &&
-                    currentUserName === review.reviewer_name
-                  }
-                  onDecision={(decision, comment) =>
-                    handleReviewDecision(review.id, decision, comment)
-                  }
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Assign reviewer — only in draft or in_review */}
-          {(isDraft || change.status === "in_review") && isAuthor && (
-            <>
-              {!addingReviewer ? (
-                <button
-                  onClick={openReviewerInput}
-                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  + Assign reviewer
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <select
-                    defaultValue=""
-                    onChange={(e) => {
-                      if (e.target.value) handleAddReviewer(e.target.value);
-                    }}
-                    className="flex-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-                    autoFocus
-                  >
-                    <option value="" disabled>Select reviewer...</option>
-                    {knownPeople
-                      .filter((p) => {
-                        if (reviews.some((r) => r.reviewer_name === p)) return false;
-                        if (p === change.author_name) return false;
-                        return true;
-                      })
-                      .map((person) => (
-                        <option key={person} value={person}>{person}</option>
-                      ))}
-                  </select>
-                  <button
-                    onClick={() => setAddingReviewer(false)}
-                    className="px-2 py-1.5 text-sm text-gray-500 hover:text-gray-700"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        <ReviewsSection
+          change={change}
+          reviews={reviews}
+          currentUserName={currentUserName}
+          isAuthor={isAuthor}
+          addingReviewer={addingReviewer}
+          knownPeople={knownPeople}
+          onOpenReviewerInput={openReviewerInput}
+          onAddReviewer={handleAddReviewer}
+          onCancelAddReviewer={() => setAddingReviewer(false)}
+          onReviewDecision={handleReviewDecision}
+        />
       </main>
     </div>
   );
