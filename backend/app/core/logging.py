@@ -49,6 +49,9 @@ def configure_logging() -> None:
 
     root.addHandler(handler)
 
-    # Quiet noisy libraries
-    logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    # Quiet noisy libraries — only our app.* loggers should be chatty
+    logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
+    logging.getLogger("uvicorn").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("asyncio").setLevel(logging.WARNING)
