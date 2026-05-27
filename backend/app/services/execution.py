@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ConflictError, GateError, ValidationError
 from app.models.audit import AuditEvent
 from app.models.change import Change, ChangeStatus
 from app.models.checklist import (
@@ -88,14 +89,14 @@ def complete_item(
     """
     # Gate: change must be executing
     if change.status != ChangeStatus.EXECUTING:
-        raise ValueError(
+        raise GateError(
             "Cannot complete checklist items — change is not in executing status. "
             f"Current status: {change.status.value}"
         )
 
     # Gate: item not already completed
     if _is_item_completed(item):
-        raise ValueError(f"Item '{item.description}' has already been completed.")
+        raise ConflictError(f"Item '{item.description}' has already been completed.")
 
     all_items = _get_ordered_items(db, change.id)
     by_phase = _items_by_phase(all_items)
@@ -106,7 +107,7 @@ def complete_item(
             break
         phase_items = by_phase.get(phase, [])
         if not _is_phase_complete(phase_items):
-            raise ValueError(
+            raise GateError(
                 f"Cannot complete items in {item.phase.value} phase — "
                 f"previous phase '{phase.value}' is not yet complete."
             )
@@ -117,7 +118,7 @@ def complete_item(
         if preceding_item.id == item.id:
             break
         if not _is_item_completed(preceding_item):
-            raise ValueError(
+            raise GateError(
                 f"Cannot complete this item out of order. "
                 f"Item '{preceding_item.description}' (order {preceding_item.order}) "
                 f"must be completed first."
@@ -127,7 +128,7 @@ def complete_item(
             preceding_item.is_hold_point
             and preceding_item.completion.hold_point_verified_by is None
         ):
-            raise ValueError(
+            raise GateError(
                 f"Cannot proceed — hold point on '{preceding_item.description}' "
                 f"has not been verified. A second person must verify before continuing."
             )
@@ -193,19 +194,19 @@ def verify_hold_point(
     - Hold point hasn't already been verified
     """
     if change.status != ChangeStatus.EXECUTING:
-        raise ValueError("Cannot verify hold points — change is not in executing status.")
+        raise GateError("Cannot verify hold points — change is not in executing status.")
 
     if not item.is_hold_point:
-        raise ValueError(f"Item '{item.description}' is not a hold point.")
+        raise ValidationError(f"Item '{item.description}' is not a hold point.")
 
     if not _is_item_completed(item):
-        raise ValueError(
+        raise GateError(
             f"Cannot verify hold point — item '{item.description}' has not been completed yet."
         )
 
     completion = item.completion
     if completion.hold_point_verified_by is not None:
-        raise ValueError(
+        raise ConflictError(
             f"Hold point on '{item.description}' has already been verified "
             f"by {completion.hold_point_verified_by}."
         )
@@ -257,7 +258,7 @@ def get_execution_status(db: Session, change: Change) -> dict:
     - phases: per-phase breakdown
     """
     if change.status != ChangeStatus.EXECUTING:
-        raise ValueError(
+        raise ValidationError(
             "Execution status is only available when the change is in executing status. "
             f"Current status: {change.status.value}"
         )

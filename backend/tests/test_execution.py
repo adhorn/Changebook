@@ -178,7 +178,7 @@ class TestSequentialUnlock:
                 "status": "completed",
             },
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 409
         assert "already" in resp.json()["detail"].lower()
 
 

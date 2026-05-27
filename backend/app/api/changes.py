@@ -257,16 +257,13 @@ def transition_change(
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
     _require_author(user, change)
-    try:
-        change = change_service.transition_status(
-            db,
-            change,
-            target_status,
-            user.name,
-            reason=reason,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    change = change_service.transition_status(
+        db,
+        change,
+        target_status,
+        user.name,
+        reason=reason,
+    )
     return change
 
 
@@ -336,12 +333,7 @@ def reorder_checklist_items(
             detail="Can only reorder checklist items on changes in draft status",
         )
 
-    try:
-        items = change_service.reorder_checklist_items(
-            db, change_id, payload.phase, payload.item_ids
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    items = change_service.reorder_checklist_items(db, change_id, payload.phase, payload.item_ids)
     return items
 
 
@@ -444,12 +436,9 @@ def complete_checklist_item(
     if not item:
         raise HTTPException(status_code=404, detail="Checklist item not found")
 
-    try:
-        completion = execution_service.complete_item(
-            db, change, item, payload.observed_result, payload.status, user.name
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    completion = execution_service.complete_item(
+        db, change, item, payload.observed_result, payload.status, user.name
+    )
     return completion
 
 
@@ -480,10 +469,7 @@ def verify_hold_point(
             f"than the one who completed the item ({item.completion.completed_by}).",
         )
 
-    try:
-        completion = execution_service.verify_hold_point(db, change, item, payload.verified_by)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    completion = execution_service.verify_hold_point(db, change, item, payload.verified_by)
     return completion
 
 
@@ -499,10 +485,7 @@ def get_execution_status(
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
 
-    try:
-        return execution_service.get_execution_status(db, change)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    return execution_service.get_execution_status(db, change)
 
 
 # --- Reviews ---
@@ -540,10 +523,7 @@ def assign_reviewer(
             detail="Cannot review your own change. A different person must review.",
         )
 
-    try:
-        review = review_service.assign_reviewer(db, change_id, reviewer_name)
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    review = review_service.assign_reviewer(db, change_id, reviewer_name)
     return review
 
 

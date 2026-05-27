@@ -14,6 +14,7 @@ from app.api.preflight import router as preflight_router
 from app.api.templates import router as templates_router
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.exceptions import ChangebookError
 from app.core.logging import configure_logging
 
 configure_logging()
@@ -26,12 +27,41 @@ app = FastAPI(
 )
 
 
+@app.exception_handler(ChangebookError)
+def domain_error_handler(request: Request, exc: ChangebookError):
+    """Handle all domain exceptions — return clean JSON with the right status code."""
+    logger.warning(
+        "Domain error: %s",
+        exc.detail,
+        extra={"action": "domain_error", "detail": type(exc).__name__},
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
+
+
 @app.exception_handler(IntegrityError)
 def integrity_error_handler(request: Request, exc: IntegrityError):
     logger.error("Database integrity error: %s", exc.orig)
     return JSONResponse(
         status_code=422,
         content={"detail": "Database constraint violation. Check that referenced resources exist."},
+    )
+
+
+@app.exception_handler(Exception)
+def unhandled_error_handler(request: Request, exc: Exception):
+    """Catch-all — log the full error, return a clean JSON response."""
+    logger.error(
+        "Unhandled error: %s",
+        str(exc),
+        exc_info=True,
+        extra={"action": "unhandled_error", "detail": type(exc).__name__},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error. Check server logs for details."},
     )
 
 

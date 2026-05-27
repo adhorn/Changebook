@@ -3,6 +3,7 @@ import uuid
 
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import ConflictError
 from app.models.audit import AuditEvent
 from app.models.review import Review, ReviewDecision
 
@@ -20,7 +21,7 @@ def assign_reviewer(db: Session, change_id: uuid.UUID, reviewer_name: str) -> Re
         .first()
     )
     if existing:
-        raise ValueError(f"Reviewer '{reviewer_name}' is already assigned")
+        raise ConflictError(f"Reviewer '{reviewer_name}' is already assigned")
 
     review = Review(
         change_id=change_id,

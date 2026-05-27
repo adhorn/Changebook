@@ -92,7 +92,7 @@ class TestAssignReviewers:
             f"/api/v1/changes/{change_id}/reviewers",
             json={"reviewer_name": "Jane Smith"},
         )
-        assert resp.status_code == 422
+        assert resp.status_code == 409
 
     def test_list_reviewers_empty(self, client, sample_change_data):
         """A change with no reviewers returns an empty list."""

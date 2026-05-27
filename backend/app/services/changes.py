@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import GateError, InvalidTransitionError, ValidationError
 from app.models.audit import AuditEvent
 from app.models.change import Change, ChangeStatus
 from app.models.checklist import ChecklistItem, ChecklistPhase
@@ -270,7 +271,7 @@ def transition_status(
                     "detail": f"missing_answers={missing_answers}",
                 },
             )
-            raise ValueError(
+            raise GateError(
                 f"Cannot submit for review — incomplete change profile. Missing: {missing_answers}"
             )
 
@@ -298,7 +299,7 @@ def transition_status(
                     "detail": f"missing_phases={sorted(p.value for p in missing_phases)}",
                 },
             )
-            raise ValueError(
+            raise GateError(
                 f"Cannot submit for review — checklist items required in all "
                 f"three phases. Missing: {sorted(p.value for p in missing_phases)}"
             )
@@ -316,7 +317,7 @@ def transition_status(
                     "detail": "no_reviewers",
                 },
             )
-            raise ValueError(
+            raise GateError(
                 "Cannot approve — no reviewers assigned. At least one reviewer must approve."
             )
         non_approved = [r for r in reviews if r.decision != ReviewDecision.APPROVED]
@@ -331,7 +332,7 @@ def transition_status(
                     "detail": f"outstanding={pending_names}",
                 },
             )
-            raise ValueError(
+            raise GateError(
                 f"Cannot approve — not all reviewers have approved. Outstanding: {pending_names}"
             )
 
@@ -342,7 +343,7 @@ def transition_status(
         all_items = list_checklist_items(db, change.id)
         incomplete = [i for i in all_items if not _is_item_completed(i)]
         if incomplete:
-            raise ValueError(
+            raise GateError(
                 f"Cannot mark done — {len(incomplete)} checklist item(s) not completed. "
                 f"All items must be completed before marking a change as done."
             )
@@ -355,7 +356,7 @@ def transition_status(
             and i.completion.hold_point_verified_by is None
         ]
         if unverified:
-            raise ValueError(
+            raise GateError(
                 f"Cannot mark done — {len(unverified)} hold point(s) not verified. "
                 f"All hold points must be verified before marking a change as done."
             )
@@ -582,7 +583,7 @@ def reorder_checklist_items(
     requested_ids = set(item_ids)
 
     if existing_ids != requested_ids:
-        raise ValueError(
+        raise ValidationError(
             f"Reorder must include all {len(existing_ids)} items for phase "
             f"'{phase.value}'. Got {len(requested_ids)}."
         )
@@ -640,7 +641,7 @@ def _invalidate_reviews_if_any(db: Session, change_id: uuid.UUID) -> None:
 def _validate_transition(current: ChangeStatus, target: ChangeStatus) -> None:
     valid = VALID_TRANSITIONS.get(current, set())
     if target not in valid:
-        raise ValueError(
+        raise InvalidTransitionError(
             f"Cannot transition from {current.value} to {target.value}. "
             f"Valid transitions: {[s.value for s in valid]}"
         )
