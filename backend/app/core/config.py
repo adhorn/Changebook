@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     # Single-tenant by default. Users never see or interact with this.
     org_name: str = "Default"
 
+    # Logging
+    log_level: str = "INFO"
+    log_format: str = "json"  # "json" or "text"
+
     # CORS
     cors_origins: list[str] = ["http://localhost:3000"]
 

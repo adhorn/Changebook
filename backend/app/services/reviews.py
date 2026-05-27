@@ -1,9 +1,12 @@
+import logging
 import uuid
 
 from sqlalchemy.orm import Session
 
 from app.models.audit import AuditEvent
 from app.models.review import Review, ReviewDecision
+
+logger = logging.getLogger(__name__)
 
 
 def assign_reviewer(db: Session, change_id: uuid.UUID, reviewer_name: str) -> Review:
@@ -27,6 +30,15 @@ def assign_reviewer(db: Session, change_id: uuid.UUID, reviewer_name: str) -> Re
     db.add(review)
     db.commit()
     db.refresh(review)
+    logger.info(
+        "Reviewer assigned: %s",
+        reviewer_name,
+        extra={
+            "change_id": str(change_id),
+            "actor": reviewer_name,
+            "action": "reviewer_assigned",
+        },
+    )
     return review
 
 
@@ -64,6 +76,17 @@ def submit_decision(
     db.add(audit)
     db.commit()
     db.refresh(review)
+    logger.info(
+        "Review decision: %s — %s",
+        review.reviewer_name,
+        decision.value,
+        extra={
+            "change_id": str(review.change_id),
+            "actor": review.reviewer_name,
+            "action": "review_decision",
+            "detail": decision.value,
+        },
+    )
     return review
 
 

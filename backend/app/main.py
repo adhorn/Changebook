@@ -14,7 +14,9 @@ from app.api.preflight import router as preflight_router
 from app.api.templates import router as templates_router
 from app.core.config import settings
 from app.core.database import get_db
+from app.core.logging import configure_logging
 
+configure_logging()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
