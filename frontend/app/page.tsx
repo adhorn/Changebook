@@ -5,25 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Change, ChangeStatus } from "@/lib/api";
 import { getCurrentUser } from "@/lib/auth";
+import { STATUS_COLORS, STATUS_LABELS, formatDate } from "@/lib/constants";
 import UserSwitcher from "@/components/UserSwitcher";
-
-const STATUS_COLORS: Record<ChangeStatus, string> = {
-  draft: "bg-gray-100 text-gray-700",
-  in_review: "bg-yellow-100 text-yellow-800",
-  approved: "bg-blue-100 text-blue-800",
-  executing: "bg-orange-100 text-orange-800",
-  done: "bg-green-100 text-green-800",
-  aborted: "bg-red-100 text-red-700",
-};
-
-const STATUS_LABELS: Record<ChangeStatus, string> = {
-  draft: "Draft",
-  in_review: "In Review",
-  approved: "Approved",
-  executing: "Executing",
-  done: "Done",
-  aborted: "Aborted",
-};
 
 function StatusBadge({ status }: { status: ChangeStatus }) {
   return (
@@ -33,16 +16,6 @@ function StatusBadge({ status }: { status: ChangeStatus }) {
       {STATUS_LABELS[status] || status}
     </span>
   );
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 export default function Home() {

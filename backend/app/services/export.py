@@ -56,17 +56,20 @@ def render_markdown(db: Session, change: Change) -> str:
             sections.append(f"*Schema version: {change.preflight_schema_version}*")
             sections.append("")
 
-        # Render answers grouped by section, using the question labels
-        question_map = {}
-        for section in PREFLIGHT_SECTIONS:
-            for q in section["questions"]:
-                question_map[q["key"]] = q["label"]
-
-        for key, answer in change.preflight_answers.items():
-            label = question_map.get(key, key)
-            sections.append(f"**{label}**")
-            sections.append(f"> {answer}")
-            sections.append("")
+        # Render answers in section order from the preflight schema
+        for pf_section in PREFLIGHT_SECTIONS:
+            section_answers = []
+            for q in pf_section["questions"]:
+                answer = change.preflight_answers.get(q["key"])
+                if answer:
+                    section_answers.append((q["label"], answer))
+            if section_answers:
+                sections.append(f"### {pf_section['title']}")
+                sections.append("")
+                for label, answer in section_answers:
+                    sections.append(f"**{label}**")
+                    sections.append(f"> {answer}")
+                    sections.append("")
 
     # Checklist
     items = db.query(ChecklistItem).filter(ChecklistItem.change_id == change.id).all()
