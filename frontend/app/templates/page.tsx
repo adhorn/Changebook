@@ -4,15 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Template } from "@/lib/api";
+import { formatDateShort } from "@/lib/constants";
 import UserSwitcher from "@/components/UserSwitcher";
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
 
 export default function TemplatesPage() {
   const router = useRouter();
@@ -126,7 +119,7 @@ export default function TemplatesPage() {
                         {tmpl.item_count !== 1 ? "s" : ""}
                       </span>
                       <span>by {tmpl.author_name}</span>
-                      <span>{formatDate(tmpl.created_at)}</span>
+                      <span>{formatDateShort(tmpl.created_at)}</span>
                     </div>
                   </div>
                   {tmpl.defence_tags && tmpl.defence_tags.length > 0 && (

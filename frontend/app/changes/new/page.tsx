@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, Customer, Environment, PreflightSection } from "@/lib/api";
+import { TIMEZONES } from "@/lib/constants";
 import UserSwitcher from "@/components/UserSwitcher";
 import SearchableSelect from "@/components/SearchableSelect";
 
@@ -240,7 +241,7 @@ export default function NewChange() {
                   onChange={(e) => setWindowTz(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
                 >
-                  {["UTC", "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Copenhagen", "US/Eastern", "US/Central", "US/Mountain", "US/Pacific", "Asia/Tokyo", "Asia/Singapore", "Australia/Sydney"].map((tz) => (
+                  {TIMEZONES.map((tz) => (
                     <option key={tz} value={tz}>{tz}</option>
                   ))}
                 </select>

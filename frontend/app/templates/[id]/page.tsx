@@ -6,24 +6,7 @@ import Link from "next/link";
 import SearchableSelect from "@/components/SearchableSelect";
 import UserSwitcher from "@/components/UserSwitcher";
 import { api, TemplateDetail, Customer, Environment } from "@/lib/api";
-
-const PHASE_LABELS: Record<string, string> = {
-  pre_flight: "Pre-flight",
-  execution: "Execution",
-  verification: "Verification",
-};
-
-const PHASE_ORDER = ["pre_flight", "execution", "verification"];
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { PHASE_LABELS, PHASE_ORDER, formatDate } from "@/lib/constants";
 
 export default function TemplateDetailPage() {
   const params = useParams();
