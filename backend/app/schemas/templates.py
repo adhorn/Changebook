@@ -28,6 +28,7 @@ class TemplateChecklistItemResponse(BaseModel):
     expected_outcome: str | None
     rollback_action: str | None
     is_hold_point: bool
+    added_during_execution: bool = False
 
 
 # --- Template schemas ---

@@ -93,6 +93,7 @@ def save_change_as_template(
                 expected_outcome=item.expected_outcome,
                 rollback_action=item.rollback_action,
                 is_hold_point=item.is_hold_point,
+                added_during_execution=item.added_during_execution,
             )
         )
 
@@ -145,6 +146,7 @@ def create_change_from_template(
                 expected_outcome=item.expected_outcome,
                 rollback_action=item.rollback_action,
                 is_hold_point=item.is_hold_point,
+                added_during_execution=item.added_during_execution,
             )
         )
 

@@ -58,5 +58,8 @@ class TemplateChecklistItem(UUIDMixin, TimestampMixin, Base):
     rollback_action: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_hold_point: Mapped[bool] = mapped_column(default=False, nullable=False)
 
+    # Deviation tracking: was this step added during execution?
+    added_during_execution: Mapped[bool] = mapped_column(default=False, nullable=False)
+
     # Relationships
     template: Mapped["ChangeTemplate"] = relationship(back_populates="items")

@@ -40,6 +40,7 @@ class ChecklistItemResponse(BaseModel):
     expected_outcome: str | None
     rollback_action: str | None
     is_hold_point: bool
+    added_during_execution: bool = False
     created_at: datetime
     completion: ChecklistCompletionResponse | None = None
 
@@ -55,6 +56,17 @@ class ChecklistItemUpdate(BaseModel):
 class ChecklistReorder(BaseModel):
     phase: ChecklistPhase
     item_ids: list[uuid.UUID]
+
+
+class ExecutionStepCreate(BaseModel):
+    """Add a step during execution — inserted after a completed item."""
+
+    insert_after_item_id: uuid.UUID
+    description: str
+    command: str | None = None
+    expected_outcome: str | None = None
+    rollback_action: str | None = None
+    is_hold_point: bool = False
 
 
 class ChecklistCompletionCreate(BaseModel):
