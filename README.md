@@ -104,7 +104,26 @@ Copy `.env.example` to `backend/.env` and adjust as needed. Key variables:
 | `CHANGEBOOK_DATABASE_URL` | `postgresql://changebook:changebook@localhost:5432/changebook` | Database connection string |
 | `CHANGEBOOK_DEBUG` | `false` | Enable SQL logging |
 | `CHANGEBOOK_CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed CORS origins (JSON array) |
+| `CHANGEBOOK_LOG_LEVEL` | `INFO` | Log verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `CHANGEBOOK_LOG_FORMAT` | `json` | `json` for structured output, `text` for local dev |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend URL for the frontend |
+
+### Logging
+
+Logs go to stdout as one JSON object per line. Every service-layer event carries `change_id`, `actor`, and `action` fields so you can trace the full lifecycle of a single change:
+
+```bash
+# Filter logs for a specific change
+uvicorn app.main:app | jq 'select(.change_id == "some-uuid")'
+
+# Show only gate rejections
+uvicorn app.main:app | jq 'select(.action == "gate_rejected")'
+
+# Save to a file
+uvicorn app.main:app | tee -a changebook.log
+```
+
+Set `CHANGEBOOK_LOG_FORMAT=text` for human-readable output during development. In production, leave it as `json` and let your infrastructure (Docker, CloudWatch, journald) handle the log drain.
 
 ## Project structure
 
