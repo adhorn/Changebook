@@ -1,6 +1,7 @@
 "use client";
 
-import { ChecklistItem, ExecutionStatus } from "@/lib/api";
+import { useState } from "react";
+import { api, ChecklistItem, ExecutionStatus } from "@/lib/api";
 import { PHASE_LABELS, PHASE_ORDER } from "@/lib/constants";
 import ChecklistItemRow from "@/components/ChecklistItemRow";
 
@@ -47,6 +48,47 @@ export default function ChecklistSection({
   onAddItem: (phase: string) => void;
   onReload: () => void;
 }) {
+  // Execution step insertion state
+  const [insertAfterItemId, setInsertAfterItemId] = useState<string | null>(null);
+  const [execStepDesc, setExecStepDesc] = useState("");
+  const [execStepCommand, setExecStepCommand] = useState("");
+  const [execStepExpected, setExecStepExpected] = useState("");
+  const [execStepRollback, setExecStepRollback] = useState("");
+  const [execStepHold, setExecStepHold] = useState(false);
+  const [execStepError, setExecStepError] = useState<string | null>(null);
+  const [execStepSubmitting, setExecStepSubmitting] = useState(false);
+
+  function resetExecStepForm() {
+    setInsertAfterItemId(null);
+    setExecStepDesc("");
+    setExecStepCommand("");
+    setExecStepExpected("");
+    setExecStepRollback("");
+    setExecStepHold(false);
+    setExecStepError(null);
+  }
+
+  async function handleAddExecutionStep() {
+    if (!insertAfterItemId || !execStepDesc.trim()) return;
+    setExecStepSubmitting(true);
+    setExecStepError(null);
+    try {
+      await api.addExecutionStep(changeId, {
+        insert_after_item_id: insertAfterItemId,
+        description: execStepDesc.trim(),
+        command: execStepCommand.trim() || undefined,
+        expected_outcome: execStepExpected.trim() || undefined,
+        rollback_action: execStepRollback.trim() || undefined,
+        is_hold_point: execStepHold,
+      });
+      resetExecStepForm();
+      onReload();
+    } catch (err: unknown) {
+      setExecStepError(err instanceof Error ? err.message : "Failed to add step");
+    }
+    setExecStepSubmitting(false);
+  }
+
   // Group checklist by phase
   const checklistByPhase: Record<string, ChecklistItem[]> = {};
   for (const item of checklist) {
@@ -89,16 +131,96 @@ export default function ChecklistSection({
             ) : (
               <div className="space-y-2">
                 {items.map((item) => (
-                  <ChecklistItemRow
-                    key={item.id}
-                    item={item}
-                    isNext={execStatus?.next_item_id === item.id}
-                    isExecuting={isExecuting}
-                    isDraft={canEdit}
-                    changeId={changeId}
-                    currentUserName={currentUserName}
-                    onCompleted={onReload}
-                  />
+                  <div key={item.id}>
+                    <ChecklistItemRow
+                      item={item}
+                      isNext={execStatus?.next_item_id === item.id}
+                      isExecuting={isExecuting}
+                      isDraft={canEdit}
+                      changeId={changeId}
+                      currentUserName={currentUserName}
+                      onCompleted={onReload}
+                      onAddStepAfter={isExecuting ? (id) => {
+                        resetExecStepForm();
+                        setInsertAfterItemId(id);
+                      } : undefined}
+                    />
+
+                    {/* Inline form to add step after this completed item */}
+                    {insertAfterItemId === item.id && (
+                      <div
+                        className="mt-2 ml-9 p-3 bg-purple-50/50 rounded-lg border border-purple-200 space-y-2"
+                        ref={(el) => {
+                          if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                        }}
+                      >
+                        <p className="text-xs font-medium text-purple-700">Add step after &ldquo;{item.description}&rdquo;</p>
+                        <input
+                          type="text"
+                          value={execStepDesc}
+                          onChange={(e) => setExecStepDesc(e.target.value)}
+                          placeholder="What needs to happen next?"
+                          className="w-full px-2 py-1.5 border border-purple-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) handleAddExecutionStep();
+                            if (e.key === "Escape") resetExecStepForm();
+                          }}
+                          autoFocus
+                        />
+                        <input
+                          type="text"
+                          value={execStepCommand}
+                          onChange={(e) => setExecStepCommand(e.target.value)}
+                          placeholder="Command (optional)"
+                          className="w-full px-2 py-1.5 border border-purple-300 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-purple-500"
+                          style={{
+                            fontVariantLigatures: "none",
+                            fontFeatureSettings: '"liga" 0, "clig" 0',
+                            textRendering: "optimizeSpeed",
+                          }}
+                        />
+                        <input
+                          type="text"
+                          value={execStepExpected}
+                          onChange={(e) => setExecStepExpected(e.target.value)}
+                          placeholder="Expected outcome (optional)"
+                          className="w-full px-2 py-1.5 border border-purple-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        />
+                        <input
+                          type="text"
+                          value={execStepRollback}
+                          onChange={(e) => setExecStepRollback(e.target.value)}
+                          placeholder="Rollback action (optional)"
+                          className="w-full px-2 py-1.5 border border-purple-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-purple-500"
+                        />
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={handleAddExecutionStep}
+                            disabled={execStepSubmitting || !execStepDesc.trim()}
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-purple-600 rounded hover:bg-purple-700 disabled:opacity-50"
+                          >
+                            {execStepSubmitting ? "Adding..." : "Add step"}
+                          </button>
+                          <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={execStepHold}
+                              onChange={(e) => setExecStepHold(e.target.checked)}
+                              className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                            />
+                            🔒 Hold point
+                          </label>
+                          <button
+                            onClick={resetExecStepForm}
+                            className="ml-auto px-2 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        {execStepError && <p className="text-xs text-red-600">{execStepError}</p>}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

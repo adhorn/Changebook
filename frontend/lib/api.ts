@@ -99,6 +99,7 @@ export interface ChecklistItem {
   expected_outcome: string | null;
   rollback_action: string | null;
   is_hold_point: boolean;
+  added_during_execution: boolean;
   created_at: string;
   completion: ChecklistCompletion | null;
 }
@@ -309,6 +310,19 @@ export const api = {
     request<ChecklistCompletion>(`/changes/${changeId}/checklist/${itemId}/hold-point-verify`, {
       method: "POST",
       body: JSON.stringify({ verified_by: verifiedBy }),
+    }),
+
+  addExecutionStep: (changeId: string, data: {
+    insert_after_item_id: string;
+    description: string;
+    command?: string;
+    expected_outcome?: string;
+    rollback_action?: string;
+    is_hold_point?: boolean;
+  }) =>
+    request<ChecklistItem>(`/changes/${changeId}/checklist/execution-step`, {
+      method: "POST",
+      body: JSON.stringify(data),
     }),
 
   getExecutionStatus: (changeId: string) =>
