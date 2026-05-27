@@ -18,7 +18,33 @@ Everything is audited. The full change — who proposed it, who reviewed it, wha
 
 Most production changes should flow through a pipeline. But some can't — infrastructure migrations, manual database operations, one-off platform changes. These still happen, and they still need discipline.
 
-Changebook tracks those changes. It's not a runbook tool or a CI/CD replacement. It's a structured record for planned changes that require human judgement, built on the same cognitive systems science that underpins checklists in aviation and other safety-critical environments.
+Changebook tracks those changes. It's not a runbook tool or a CI/CD replacement. It's a structured record for planned changes that require human judgement.
+
+## Design principles
+
+Changebook is grounded in cognitive systems engineering (CSE) — the same discipline behind checklists in aviation and decision support in other safety-critical environments. Each principle translates into a specific tool behaviour:
+
+**Cognitive forcing functions.** The pre-flight questions don't score risk or make decisions. They force the operator to think before acting. *What happens if this fails? What's the blast radius? How do you roll back, and how long does it take?* The section ordering is deliberate: what you're doing, then who it affects, then what happens if it goes wrong. That sequence walks the operator through a mental simulation of the change before a single command runs.
+
+**Common ground, not gatekeeping.** Reviewers see everything the author sees — pre-flight answers, the full checklist, the maintenance window. The review isn't an approval stamp. It's two people building shared understanding of what's about to happen. Hold points are the sharpest version: execution stops until a second person confirms they see what the operator sees.
+
+**Show, don't decide.** During execution, the operator sees the maintenance window, the expected outcome for each step, the rollback action. The completion form asks *"what did you observe?"* — not *"did it pass?"* There's no green/red traffic light. The operator records what happened and decides whether to proceed.
+
+**Organisational memory through templates.** Templates don't come from playbooks written in advance. They come from changes that were actually executed. A team does a certificate rotation, works through the steps, discovers the edge cases, records what they observed — then saves it as a template. Next time, the starting point is real operational experience, not theory. Customer-specific context is stripped; the procedure transfers, the context doesn't.
+
+**The audit trail is the team's memory.** Every state transition, every review decision, every step completion — who did it, when, what they observed. This isn't for auditors. It's so the team can look back at what actually happened during a change, not what they planned to happen.
+
+## Key features
+
+- **Pre-flight profile** — structured questions that force thinking about blast radius, rollback, dependencies, and customer impact before execution begins
+- **Phased checklists** — pre-flight, execution, and verification steps with observed results recorded at each step
+- **Hold points** — steps that require a second person to verify before proceeding
+- **Peer review** — approve, request changes, or block a change before execution starts
+- **Maintenance windows** — structured datetime range with timezone, visible during execution
+- **Templates** — save any completed change as a reusable procedure; the library grows from real operations
+- **Markdown export** — full change record (metadata, pre-flight answers, checklist, reviews, audit trail) as a portable document
+- **Audit trail** — every state transition, review, and completion recorded with actor and timestamp
+- **Multi-tenancy** — customers, services, and environments scoped to an organisation
 
 ## Quick start
 
@@ -79,6 +105,26 @@ Copy `.env.example` to `backend/.env` and adjust as needed. Key variables:
 | `CHANGEBOOK_DEBUG` | `false` | Enable SQL logging |
 | `CHANGEBOOK_CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed CORS origins (JSON array) |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | Backend URL for the frontend |
+
+## Project structure
+
+```
+backend/
+  app/
+    api/          # FastAPI route handlers (thin — delegate to services)
+    core/         # Config, database, auth
+    models/       # SQLAlchemy models
+    schemas/      # Pydantic request/response schemas
+    services/     # Business logic (state machine, export, templates)
+  tests/          # 218 pytest tests
+  migrations/     # Alembic migrations
+
+frontend/
+  app/            # Next.js App Router pages
+  components/     # Shared React components
+  lib/            # API client, auth, shared constants
+  e2e/            # Playwright end-to-end tests
+```
 
 ## Tech stack
 
