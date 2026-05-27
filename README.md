@@ -102,7 +102,7 @@ Copy `.env.example` to `backend/.env` and adjust as needed. Key variables:
 | Variable | Default | Description |
 |---|---|---|
 | `CHANGEBOOK_DATABASE_URL` | `postgresql://changebook:changebook@localhost:5432/changebook` | Database connection string |
-| `CHANGEBOOK_DEBUG` | `false` | Enable SQL logging |
+| `CHANGEBOOK_DEBUG` | `false` | Debug mode |
 | `CHANGEBOOK_CORS_ORIGINS` | `["http://localhost:3000"]` | Allowed CORS origins (JSON array) |
 | `CHANGEBOOK_LOG_LEVEL` | `INFO` | Log verbosity (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
 | `CHANGEBOOK_LOG_FORMAT` | `json` | `json` for structured output, `text` for local dev |
@@ -124,6 +124,8 @@ uvicorn app.main:app | tee -a changebook.log
 ```
 
 Set `CHANGEBOOK_LOG_FORMAT=text` for human-readable output during development. In production, leave it as `json` and let your infrastructure (Docker, CloudWatch, journald) handle the log drain.
+
+If you want SQL queries in the logs for debugging, set the `sqlalchemy` logger to `DEBUG` in `backend/app/core/logging.py` — that way SQL output goes through the same formatter and level controls as everything else. Don't use `echo=True` on the SQLAlchemy engine; it attaches its own handler that bypasses log level settings and floods stdout with ROLLBACK/COMMIT noise on every request.
 
 ## Project structure
 
