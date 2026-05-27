@@ -707,3 +707,221 @@ class TestExecutionAudit:
         )
         assert len(events) == 1
         assert events[0].actor_name == "Jane Smith"
+
+
+class TestAddExecutionStep:
+    """Steps can be added during execution after a completed item."""
+
+    def test_add_step_during_execution(self, client, sample_change_data):
+        """An operator can add a step after a completed item."""
+        items_def = {
+            "pre_flight": [{"description": "Pre-flight check"}],
+            "execution": [
+                {"description": "Step 1: Apply config"},
+                {"description": "Step 2: Restart service"},
+            ],
+            "verification": [{"description": "Check health"}],
+        }
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
+
+        # Complete pre-flight
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
+            json={"observed_result": "OK", "status": "completed"},
+        )
+        # Complete first execution step
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
+            json={"observed_result": "Config applied", "status": "completed"},
+        )
+
+        # Add a step after the first execution item
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/checklist/execution-step",
+            json={
+                "insert_after_item_id": items["execution"][0]["id"],
+                "description": "Verify config took effect before restarting",
+                "command": "cat /etc/app/config.yaml",
+                "expected_outcome": "New values visible in config file",
+            },
+        )
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["added_during_execution"] is True
+        assert data["phase"] == "execution"
+        assert data["order"] == 2  # Inserted after step 1
+
+        # Verify the original step 2 was renumbered to 3
+        checklist = client.get(
+            f"/api/v1/changes/{change_id}/checklist", params={"phase": "execution"}
+        )
+        execution_items = sorted(checklist.json(), key=lambda i: i["order"])
+        assert len(execution_items) == 3
+        assert execution_items[0]["description"] == "Step 1: Apply config"
+        assert execution_items[0]["order"] == 1
+        assert execution_items[1]["description"] == "Verify config took effect before restarting"
+        assert execution_items[1]["order"] == 2
+        assert execution_items[1]["added_during_execution"] is True
+        assert execution_items[2]["description"] == "Step 2: Restart service"
+        assert execution_items[2]["order"] == 3
+
+    def test_cannot_add_step_after_incomplete_item(self, client, sample_change_data):
+        """Cannot add a step after an item that hasn't been completed yet."""
+        items_def = {
+            "pre_flight": [{"description": "Pre-flight check"}],
+            "execution": [{"description": "Step 1"}],
+            "verification": [{"description": "Check health"}],
+        }
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
+
+        # Don't complete anything — try to add after the incomplete execution item
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/checklist/execution-step",
+            json={
+                "insert_after_item_id": items["execution"][0]["id"],
+                "description": "Should not be allowed",
+            },
+        )
+        assert resp.status_code == 422
+        assert "incomplete" in resp.json()["detail"].lower()
+
+    def test_cannot_add_step_in_wrong_status(self, client, sample_change_data):
+        """Cannot add execution steps when the change is not in executing status."""
+        resp = client.post(
+            "/api/v1/changes",
+            json={
+                "title": "Draft change",
+                **sample_change_data,
+                "preflight_answers": _complete_preflight(client),
+            },
+        )
+        change_id = resp.json()["id"]
+        # Add an item in draft
+        item = client.post(
+            f"/api/v1/changes/{change_id}/checklist",
+            json={"phase": "execution", "description": "Step 1"},
+        )
+
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/checklist/execution-step",
+            json={
+                "insert_after_item_id": item.json()["id"],
+                "description": "Should not be allowed",
+            },
+        )
+        assert resp.status_code == 422
+        assert "executing" in resp.json()["detail"].lower()
+
+    def test_added_step_blocks_progression(self, client, sample_change_data):
+        """A newly added step must be completed before moving to the next original step."""
+        items_def = {
+            "pre_flight": [{"description": "Pre-flight check"}],
+            "execution": [
+                {"description": "Step 1"},
+                {"description": "Step 2"},
+            ],
+            "verification": [{"description": "Check health"}],
+        }
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
+
+        # Complete pre-flight and first execution step
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
+            json={"observed_result": "OK", "status": "completed"},
+        )
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
+            json={"observed_result": "Done", "status": "completed"},
+        )
+
+        # Add a step between step 1 and step 2
+        new_step = client.post(
+            f"/api/v1/changes/{change_id}/checklist/execution-step",
+            json={
+                "insert_after_item_id": items["execution"][0]["id"],
+                "description": "Inserted step",
+            },
+        )
+        new_step_id = new_step.json()["id"]
+
+        # Try to complete original step 2 (now order 3) — should fail because
+        # the inserted step (order 2) is not yet completed
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][1]['id']}/complete",
+            json={"observed_result": "Should fail", "status": "completed"},
+        )
+        assert resp.status_code == 422
+        assert "order" in resp.json()["detail"].lower()
+
+        # Complete the inserted step, then original step 2 should work
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{new_step_id}/complete",
+            json={"observed_result": "Verified", "status": "completed"},
+        )
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][1]['id']}/complete",
+            json={"observed_result": "Service restarted", "status": "completed"},
+        )
+        assert resp.status_code == 200
+
+    def test_added_step_flagged_in_response(self, client, sample_change_data):
+        """Original items have added_during_execution=False, new items have True."""
+        items_def = {
+            "pre_flight": [{"description": "Pre-flight check"}],
+            "execution": [{"description": "Original step"}],
+            "verification": [{"description": "Check health"}],
+        }
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
+
+        # Original item should be False
+        resp = client.get(f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}")
+        assert resp.json()["added_during_execution"] is False
+
+    def test_template_preserves_added_flag(self, client, sample_change_data, db):
+        """When saving a change as a template, the added_during_execution flag carries through."""
+        items_def = {
+            "pre_flight": [{"description": "Pre-flight check"}],
+            "execution": [
+                {"description": "Original step"},
+                {"description": "Second step"},
+            ],
+            "verification": [{"description": "Check health"}],
+        }
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
+
+        # Complete pre-flight and first execution step
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
+            json={"observed_result": "OK", "status": "completed"},
+        )
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
+            json={"observed_result": "Done", "status": "completed"},
+        )
+
+        # Add a step during execution
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/execution-step",
+            json={
+                "insert_after_item_id": items["execution"][0]["id"],
+                "description": "Discovered step",
+            },
+        )
+
+        # Save as template
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/save-as-template",
+            json={"title": "Template with deviation"},
+        )
+        assert resp.status_code == 201
+        template_id = resp.json()["id"]
+
+        # Check template items
+        template = client.get(f"/api/v1/templates/{template_id}")
+        template_items = [i for i in template.json()["items"] if i["phase"] == "execution"]
+        template_items.sort(key=lambda i: i["order"])
+        assert len(template_items) == 3
+        assert template_items[0]["added_during_execution"] is False
+        assert template_items[1]["added_during_execution"] is True
+        assert template_items[1]["description"] == "Discovered step"
+        assert template_items[2]["added_during_execution"] is False

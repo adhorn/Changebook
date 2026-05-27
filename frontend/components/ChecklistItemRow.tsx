@@ -13,6 +13,7 @@ export default function ChecklistItemRow({
   changeId,
   currentUserName,
   onCompleted,
+  onAddStepAfter,
 }: {
   item: ChecklistItem;
   isNext: boolean;
@@ -21,6 +22,7 @@ export default function ChecklistItemRow({
   changeId: string;
   currentUserName: string;
   onCompleted: () => void;
+  onAddStepAfter?: (itemId: string) => void;
 }) {
   const [showComplete, setShowComplete] = useState(false);
   const [showVerify, setShowVerify] = useState(false);
@@ -270,11 +272,18 @@ export default function ChecklistItemRow({
               Rollback: {item.rollback_action}
             </p>
           )}
-          {item.is_hold_point && (
-            <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-              Hold Point
-            </span>
-          )}
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            {item.is_hold_point && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                Hold Point
+              </span>
+            )}
+            {item.added_during_execution && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                Added during execution
+              </span>
+            )}
+          </div>
 
           {/* Completion details */}
           {isCompleted && completion && (
@@ -367,6 +376,16 @@ export default function ChecklistItemRow({
                 </div>
               )}
             </>
+          )}
+
+          {/* Add step after — only on completed items during execution */}
+          {isCompleted && isExecuting && onAddStepAfter && (
+            <button
+              onClick={() => onAddStepAfter(item.id)}
+              className="mt-2 px-2 py-1 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+            >
+              + Add step after this
+            </button>
           )}
 
           {/* Complete button */}

@@ -47,6 +47,9 @@ class ChecklistItem(UUIDMixin, TimestampMixin, Base):
     # Hold point: execution pauses here until independent verification
     is_hold_point: Mapped[bool] = mapped_column(default=False, nullable=False)
 
+    # Deviation tracking: was this step added during execution?
+    added_during_execution: Mapped[bool] = mapped_column(default=False, nullable=False)
+
     # Relationships
     change: Mapped["Change"] = relationship(back_populates="checklist_items")  # noqa: F821
     completion: Mapped["ChecklistCompletion | None"] = relationship(

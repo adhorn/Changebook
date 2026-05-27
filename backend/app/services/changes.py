@@ -211,6 +211,7 @@ def duplicate_change(db: Session, source: Change, overrides: dict, author_name: 
             expected_outcome=item.expected_outcome,
             rollback_action=item.rollback_action,
             is_hold_point=item.is_hold_point,
+            added_during_execution=item.added_during_execution,
         )
         db.add(clone_item)
 

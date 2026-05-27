@@ -318,3 +318,100 @@ def get_execution_status(db: Session, change: Change) -> dict:
         "all_complete": all_complete,
         "phases": phases,
     }
+
+
+def add_execution_step(
+    db: Session,
+    change: Change,
+    insert_after_item: ChecklistItem,
+    data: dict,
+    added_by: str,
+) -> ChecklistItem:
+    """Add a checklist step during execution — capturing what the operator learned.
+
+    Validates:
+    - Change is in executing status
+    - insert_after_item belongs to this change
+    - insert_after_item has been completed (you're recording a deviation, not pre-planning)
+
+    The new item is inserted immediately after insert_after_item in the same phase.
+    All subsequent items in the phase are renumbered.
+    """
+    if change.status != ChangeStatus.EXECUTING:
+        raise GateError(
+            "Cannot add execution steps — change is not in executing status. "
+            f"Current status: {change.status.value}"
+        )
+
+    if insert_after_item.change_id != change.id:
+        raise ValidationError("The referenced item does not belong to this change.")
+
+    if not _is_item_completed(insert_after_item):
+        raise GateError(
+            "Cannot add a step after an incomplete item. "
+            "Complete the current step first — you're capturing what you learned, "
+            "not pre-planning."
+        )
+
+    # Renumber: bump all items in the same phase with order > insert_after_item.order
+    new_order = insert_after_item.order + 1
+    subsequent_items = (
+        db.query(ChecklistItem)
+        .filter(
+            ChecklistItem.change_id == change.id,
+            ChecklistItem.phase == insert_after_item.phase,
+            ChecklistItem.order >= new_order,
+        )
+        .all()
+    )
+    for item in subsequent_items:
+        item.order += 1
+
+    # Create the new item
+    new_item = ChecklistItem(
+        change_id=change.id,
+        phase=insert_after_item.phase,
+        order=new_order,
+        description=data["description"],
+        command=data.get("command"),
+        expected_outcome=data.get("expected_outcome"),
+        rollback_action=data.get("rollback_action"),
+        is_hold_point=data.get("is_hold_point", False),
+        added_during_execution=True,
+    )
+    db.add(new_item)
+
+    # Audit
+    audit = AuditEvent(
+        change_id=change.id,
+        event_type="execution_step_added",
+        actor_name=added_by,
+        description=(
+            f"Step added during execution: '{new_item.description}' "
+            f"[{insert_after_item.phase.value}/{new_order}] "
+            f"after '{insert_after_item.description}'"
+        ),
+        event_data={
+            "phase": insert_after_item.phase.value,
+            "order": new_order,
+            "insert_after_item_id": str(insert_after_item.id),
+            "description": new_item.description,
+            "is_hold_point": new_item.is_hold_point,
+        },
+    )
+    db.add(audit)
+    db.commit()
+    db.refresh(new_item)
+    logger.info(
+        "Execution step added: %s [%s/%d]",
+        new_item.description,
+        insert_after_item.phase.value,
+        new_order,
+        extra={
+            "change_id": str(change.id),
+            "actor": added_by,
+            "action": "execution_step_added",
+            "detail": f"phase={insert_after_item.phase.value} order={new_order}",
+        },
+    )
+    return new_item

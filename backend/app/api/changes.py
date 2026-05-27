@@ -27,6 +27,7 @@ from app.schemas.checklist import (
     ChecklistItemUpdate,
     ChecklistReorder,
     ExecutionStatusResponse,
+    ExecutionStepCreate,
     HoldPointVerify,
 )
 from app.schemas.reviews import ReviewDecisionSubmit, ReviewerAssign, ReviewResponse
@@ -471,6 +472,32 @@ def verify_hold_point(
 
     completion = execution_service.verify_hold_point(db, change, item, payload.verified_by)
     return completion
+
+
+@router.post(
+    "/{change_id}/checklist/execution-step",
+    response_model=ChecklistItemResponse,
+    status_code=201,
+)
+def add_execution_step(
+    change_id: uuid.UUID,
+    payload: ExecutionStepCreate,
+    user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Add a checklist step during execution — capturing what the operator learned."""
+    change = change_service.get_change(db, change_id)
+    if not change:
+        raise HTTPException(status_code=404, detail="Change not found")
+
+    insert_after_item = change_service.get_checklist_item(
+        db, change_id, payload.insert_after_item_id
+    )
+    if not insert_after_item:
+        raise HTTPException(status_code=404, detail="Insert-after item not found")
+
+    data = payload.model_dump(exclude={"insert_after_item_id"})
+    return execution_service.add_execution_step(db, change, insert_after_item, data, user.name)
 
 
 @router.get(

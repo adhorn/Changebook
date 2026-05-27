@@ -93,6 +93,7 @@ def render_markdown(db: Session, change: Change) -> str:
 
             for item in phase_items:
                 hold = " 🔒" if item.is_hold_point else ""
+                added = " [ADDED]" if item.added_during_execution else ""
                 completion = item.completion
 
                 if completion:
@@ -102,7 +103,7 @@ def render_markdown(db: Session, change: Change) -> str:
                         "skipped_with_justification": "⏭️",
                     }.get(completion.status.value, "❓")
 
-                    sections.append(f"{item.order}. {status_icon} {item.description}{hold}")
+                    sections.append(f"{item.order}. {status_icon}{added} {item.description}{hold}")
                     sections.append(f"   - **Observed:** {completion.observed_result}")
                     sections.append(
                         f"   - **By:** {completion.completed_by} at {completion.completed_at}"
@@ -114,7 +115,7 @@ def render_markdown(db: Session, change: Change) -> str:
                             f"at {completion.hold_point_verified_at}"
                         )
                 else:
-                    sections.append(f"{item.order}. ⬜ {item.description}{hold}")
+                    sections.append(f"{item.order}. ⬜{added} {item.description}{hold}")
 
                 if item.command:
                     sections.append(f"   - **Command:** `{item.command}`")
