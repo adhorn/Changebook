@@ -48,7 +48,7 @@ ruff format --check .
 # Frontend build check
 cd frontend && npx next build
 
-# E2E tests (requires backend + frontend running)
+# E2E tests (requires Postgres with changebook_test DB — see below)
 cd frontend && npx playwright test
 ```
 
@@ -56,18 +56,28 @@ All tests must pass before submitting a PR. The CI pipeline runs the same checks
 
 #### E2E tests
 
-The E2E tests use Playwright and run against the full stack (backend + frontend). If both are already running locally, Playwright reuses them. Otherwise it starts them automatically.
+E2E tests run on **separate ports** (backend 8001, frontend 3001) against a **separate test database** (`changebook_test`), so they never touch the dev database or conflict with `docker compose up`.
+
+**Prerequisites:**
+
+1. Docker must be running — `docker compose up db` creates both the `changebook` and `changebook_test` databases (via `backend/init-test-db.sql`).
+2. Install the browser: `cd frontend && npx playwright install chromium`
+
+**Running:**
 
 ```bash
-# First time: install browser
-cd frontend && npx playwright install chromium
+cd frontend
 
-# Run all E2E tests
+# Run all E2E tests — Playwright starts backend (port 8001) and frontend (port 3001) automatically
 npx playwright test
 
 # Run with visible browser
 npx playwright test --headed
 ```
+
+If a backend is already running on port 8001, Playwright reuses it (locally only — CI always starts fresh). The test port and database configuration lives in `frontend/e2e/config.ts`.
+
+**Note:** If you see a timeout on the backend health check, make sure Postgres is running and the `changebook_test` database exists. Run `docker compose up db` to create it.
 
 ## Development workflow
 
