@@ -139,20 +139,9 @@ jobs:
         working-directory: frontend
       - run: npx playwright install chromium
         working-directory: frontend
-      - name: Start backend
-        run: uvicorn app.main:app --host 0.0.0.0 --port 8000 &
-        working-directory: backend
-      - name: Start frontend
-        run: npm run dev &
-        working-directory: frontend
-        env:
-          NEXT_PUBLIC_API_URL: http://localhost:8000
-      - name: Wait for services
-        run: |
-          timeout 30 bash -c 'until curl -sf http://localhost:8000/health > /dev/null 2>&1; do sleep 1; done'
-          echo "Backend ready"
-          timeout 30 bash -c 'until curl -sf http://localhost:3000 > /dev/null 2>&1; do sleep 1; done'
-          echo "Frontend ready"
+      # Playwright's webServer config starts both backend (port 8001) and
+      # frontend (port 3001) with the correct DB URL and CORS settings.
+      # No manual server management needed here.
       - run: npx playwright test --reporter=github
         working-directory: frontend
       - uses: actions/upload-artifact@v4
