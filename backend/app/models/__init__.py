@@ -12,6 +12,7 @@ from app.models.environment import Environment
 from app.models.organisation import Organisation
 from app.models.preflight import PREFLIGHT_SCHEMA_VERSION, get_preflight_schema
 from app.models.review import Review, ReviewDecision
+from app.models.team import Team
 from app.models.template import ChangeTemplate, TemplateChecklistItem
 
 __all__ = [
@@ -32,6 +33,7 @@ __all__ = [
     "Review",
     "ReviewDecision",
     "AuditEvent",
+    "Team",
     "ChangeTemplate",
     "TemplateChecklistItem",
 ]

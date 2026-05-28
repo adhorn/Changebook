@@ -39,6 +39,8 @@ include = ["app*"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+# Alembic auto-generates migration files with its own style
+extend-exclude = ["migrations/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP"]
