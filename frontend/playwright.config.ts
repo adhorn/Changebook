@@ -1,13 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
-
-// E2E tests run outside Docker on separate ports (8001, 3001) against
-// the test database, so they never conflict with the dev server running
-// via docker-compose on 8000/3000.
-const E2E_BACKEND_PORT = 8001;
-const E2E_FRONTEND_PORT = 3001;
-const E2E_BACKEND_URL = `http://localhost:${E2E_BACKEND_PORT}`;
-const E2E_DB_URL =
-  "postgresql://changebook:changebook@localhost:5432/changebook_test";
+import {
+  E2E_BACKEND_PORT,
+  E2E_BACKEND_URL,
+  E2E_DB_URL,
+  E2E_FRONTEND_PORT,
+} from "./e2e/config";
 
 export default defineConfig({
   testDir: "./e2e",
