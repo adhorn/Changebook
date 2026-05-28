@@ -1,5 +1,14 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// E2E tests run outside Docker on separate ports (8001, 3001) against
+// the test database, so they never conflict with the dev server running
+// via docker-compose on 8000/3000.
+const E2E_BACKEND_PORT = 8001;
+const E2E_FRONTEND_PORT = 3001;
+const E2E_BACKEND_URL = `http://localhost:${E2E_BACKEND_PORT}`;
+const E2E_DB_URL =
+  "postgresql://changebook:changebook@localhost:5432/changebook_test";
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: false, // tests depend on shared state (created changes)
@@ -9,7 +18,7 @@ export default defineConfig({
   reporter: process.env.CI ? "github" : "html",
 
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: `http://localhost:${E2E_FRONTEND_PORT}`,
     trace: "on-first-retry",
   },
 
@@ -22,16 +31,15 @@ export default defineConfig({
 
   webServer: [
     {
-      command:
-        "cd ../backend && uvicorn app.main:app --host 0.0.0.0 --port 8000",
-      url: "http://localhost:8000/health",
-      reuseExistingServer: true,
+      command: `cd ../backend && CHANGEBOOK_DATABASE_URL=${E2E_DB_URL} CHANGEBOOK_CORS_ORIGINS='["http://localhost:${E2E_FRONTEND_PORT}"]' uvicorn app.main:app --host 0.0.0.0 --port ${E2E_BACKEND_PORT}`,
+      url: `${E2E_BACKEND_URL}/health`,
+      reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },
     {
-      command: "npm run dev",
-      url: "http://localhost:3000",
-      reuseExistingServer: true,
+      command: `NEXT_PUBLIC_API_URL=${E2E_BACKEND_URL} npx next dev --port ${E2E_FRONTEND_PORT}`,
+      url: `http://localhost:${E2E_FRONTEND_PORT}`,
+      reuseExistingServer: !process.env.CI,
       timeout: 30_000,
     },
   ],

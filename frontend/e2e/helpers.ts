@@ -1,6 +1,7 @@
 import { Page } from "@playwright/test";
 
-const API = "http://localhost:8000/api/v1";
+// Must match E2E_BACKEND_PORT in playwright.config.ts
+const API = "http://localhost:8001/api/v1";
 
 const ALICE_HEADERS = { "X-User-Email": "alice@changebook.dev", "X-User-Name": "Alice Engineer" };
 

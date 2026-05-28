@@ -48,6 +48,7 @@ test.describe.serial("Template use", () => {
     await switchUser(page, USERS.alice);
     await page.goto(`/templates/${templateId}`);
     await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(500);
 
     // Verify template detail shows the items
     await expect(page.getByText("Verify backup exists")).toBeVisible();
