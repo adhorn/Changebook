@@ -1,5 +1,8 @@
 import os
 
+# Skip Alembic migrations in app startup — tests manage their own schema
+os.environ["TESTING"] = "1"
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

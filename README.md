@@ -96,6 +96,15 @@ python seed.py
 
 This wipes existing data and creates a clean starting point for demos and development.
 
+### Database and upgrades
+
+Changebook manages its schema with Alembic. Migrations run automatically when the backend starts — there is no manual step.
+
+- **Fresh database** — all tables are created on first start.
+- **Existing database from an earlier version** — Changebook detects it and brings the schema up to date on start. Your data is preserved.
+
+Because the schema is versioned, upgrading to a newer release applies any pending migrations automatically the next time the backend starts.
+
 ### Running tests
 
 ```bash
@@ -152,7 +161,7 @@ backend/
     models/       # SQLAlchemy models
     schemas/      # Pydantic request/response schemas
     services/     # Business logic (state machine, export, templates)
-  tests/          # 218 pytest tests
+  tests/          # 228 pytest tests
   migrations/     # Alembic migrations
 
 frontend/

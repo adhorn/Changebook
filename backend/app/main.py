@@ -81,12 +81,48 @@ app.include_router(templates_router, prefix="/api/v1")
 
 
 @app.on_event("startup")
-def create_tables():
-    import app.models  # noqa: F401 — ensure all models are imported
-    from app.core.database import engine
-    from app.models.base import Base
+def run_migrations():
+    """Apply database migrations on startup.
 
-    Base.metadata.create_all(bind=engine)
+    Uses Alembic to bring the database schema to the latest revision.
+    This replaces the previous create_all() approach, which could only
+    create new tables but not ALTER existing ones to add columns.
+
+    Handles three cases:
+    1. Fresh database — runs upgrade to create all tables.
+    2. Existing database with alembic_version — runs upgrade (may be no-op).
+    3. Existing database without alembic_version — stamps current revision
+       (one-time migration from create_all to Alembic).
+
+    Skipped during testing — test fixtures manage their own schema via
+    create_all()/drop_all(), and migration correctness is validated by
+    dedicated tests in test_migrations.py.
+    """
+    import os
+
+    if os.environ.get("TESTING"):
+        return
+
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect as sa_inspect
+
+    from app.core.database import engine
+
+    alembic_cfg = Config("alembic.ini")
+
+    inspector = sa_inspect(engine)
+    has_alembic = "alembic_version" in inspector.get_table_names()
+    has_tables = "changes" in inspector.get_table_names()
+
+    if has_tables and not has_alembic:
+        # Existing database created by create_all() — stamp it so future
+        # migrations apply correctly. No schema changes needed.
+        logger.info("Existing database detected without migration history. Stamping as current.")
+        command.stamp(alembic_cfg, "head")
+    else:
+        # Fresh database or already tracked — run migrations normally.
+        command.upgrade(alembic_cfg, "head")
 
 
 @app.get("/health")

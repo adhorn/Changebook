@@ -71,6 +71,42 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: pytest tests/integration -v --tb=short
 
+  migration-check:
+    name: Migration check (models vs migrations)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: changebook
+          POSTGRES_PASSWORD: changebook
+          POSTGRES_DB: changebook_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U changebook"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      CHANGEBOOK_DATABASE_URL: postgresql://changebook:changebook@localhost:5432/changebook_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -e ".[dev]"
+      # Bring the database to the latest migration, then verify the SQLAlchemy
+      # models have no schema changes that a migration hasn't captured. If a
+      # model was edited without a matching migration, `alembic check` exits
+      # non-zero and this job fails — flagging the PR as needing a migration.
+      - run: alembic upgrade head
+      - run: alembic check
+
   backend-lint:
     name: Backend lint
     runs-on: ubuntu-latest

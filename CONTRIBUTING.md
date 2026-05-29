@@ -112,6 +112,21 @@ If a backend is already running on port 8001, Playwright reuses it (locally only
 - Use the test helpers in `conftest.py` for creating test data
 - Integration tests (in `tests/integration/`) run against Postgres and are skipped locally
 
+### Database migrations
+
+The schema is managed by Alembic. Any change to a model under `app/models/` — a new table, a new column, a changed type or constraint — needs a matching migration committed **in the same PR**.
+
+Generate one after editing the models:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "describe the change"
+# review the generated file in migrations/versions/, then apply it:
+alembic upgrade head
+```
+
+CI runs `alembic check` and fails the PR if a model change has no matching migration. Note that the test suite uses `create_all()` for speed, so **tests will not catch a missing migration** — `alembic check` is the guard.
+
 ## Reporting bugs
 
 Open an issue with:
