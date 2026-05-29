@@ -98,10 +98,10 @@ test.describe.serial("Review indicator", () => {
     await page.locator("select").selectOption("in_review");
     await page.waitForTimeout(500);
 
+    // The change must be visible — assert it, then verify no badge
     const row = page.getByRole("row", { name: /E2E: Review indicator test/ });
-    if (await row.first().isVisible()) {
-      await expect(row.first().getByText("Needs your review")).not.toBeVisible();
-    }
+    await expect(row.first()).toBeVisible();
+    await expect(row.first().getByText("Needs your review")).not.toBeVisible();
   });
 
   test("after Bob approves, badge disappears", async ({ page }) => {
@@ -115,13 +115,13 @@ test.describe.serial("Review indicator", () => {
     await page.goto("/");
     await page.waitForLoadState("networkidle");
 
-    // Filter to in_review
+    // Filter to in_review — the change is still in_review (not yet transitioned
+    // to approved by author), so it must appear without the badge
     await page.locator("select").selectOption("in_review");
     await page.waitForTimeout(500);
 
     const row = page.getByRole("row", { name: /E2E: Review indicator test/ });
-    if (await row.first().isVisible()) {
-      await expect(row.first().getByText("Needs your review")).not.toBeVisible();
-    }
+    await expect(row.first()).toBeVisible();
+    await expect(row.first().getByText("Needs your review")).not.toBeVisible();
   });
 });
