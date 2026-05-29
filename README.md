@@ -103,7 +103,7 @@ Changebook manages its schema with Alembic. Migrations run automatically when th
 - **Fresh database** — all tables are created on first start.
 - **Existing database from an earlier version** — Changebook detects it and brings the schema up to date on start. Your data is preserved.
 
-Because the schema is versioned, upgrading to a newer release applies any pending migrations automatically the next time the backend starts. (Earlier versions used `create_all()`, which could add new tables but not alter existing ones — so schema changes never reached a database that already had data. Alembic closes that gap.)
+Because the schema is versioned, upgrading to a newer release applies any pending migrations automatically the next time the backend starts.
 
 ### Running tests
 
