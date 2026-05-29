@@ -3,11 +3,24 @@ import { E2E_API_URL } from "./config";
 
 const API = E2E_API_URL;
 
-const ALICE_HEADERS = { "X-User-Email": "alice@changebook.dev", "X-User-Name": "Alice Engineer" };
+const ALICE = { email: "alice@changebook.dev", name: "Alice Engineer" };
 
-async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
+function headersFor(user: { email: string; name: string }): Record<string, string> {
+  return {
+    "X-User-Email": user.email,
+    "X-User-Name": user.name,
+    "Content-Type": "application/json",
+  };
+}
+
+/** API fetch as a specific user. Throws on non-2xx responses. */
+export async function apiFetchAs(
+  user: { email: string; name: string },
+  path: string,
+  options?: RequestInit,
+): Promise<Response> {
   const res = await fetch(`${API}${path}`, {
-    headers: { ...ALICE_HEADERS, "Content-Type": "application/json" },
+    headers: headersFor(user),
     ...options,
   });
   if (!res.ok) {
@@ -15,6 +28,11 @@ async function apiFetch(path: string, options?: RequestInit): Promise<Response> 
     throw new Error(`API ${options?.method || "GET"} ${path} returned ${res.status}: ${text}`);
   }
   return res;
+}
+
+/** API fetch as Alice (default user). Throws on non-2xx responses. */
+export async function apiFetch(path: string, options?: RequestInit): Promise<Response> {
+  return apiFetchAs(ALICE, path, options);
 }
 
 /** Create a customer with a service via API, return their IDs. Idempotent. */
@@ -117,7 +135,7 @@ export async function createChangeViaAPI(opts?: {
 
   if (opts?.preflight) {
     // Minimal preflight answers for the required keys
-    const schemaRes = await apiFetch("/preflight-schema");
+    const schemaRes = await apiFetch("/preflight-questions");
     const schema = await schemaRes.json();
     const answers: Record<string, string> = {};
     for (const section of schema.sections) {
@@ -132,6 +150,67 @@ export async function createChangeViaAPI(opts?: {
   }
 
   return changeId;
+}
+
+/** Drive a change through the lifecycle to a target status via API.
+ *  Handles all intermediate transitions (reviewer assignment, approval, etc.). */
+export async function driveChangeToStatus(
+  changeId: string,
+  targetStatus: "in_review" | "approved" | "executing" | "done" | "aborted",
+): Promise<void> {
+  const bob = { email: "bob@changebook.dev", name: "Bob Reviewer" };
+
+  if (targetStatus === "aborted") {
+    await apiFetch(
+      `/changes/${changeId}/transition?target_status=aborted&reason=E2E+test`,
+      { method: "POST" },
+    );
+    return;
+  }
+
+  // draft → in_review
+  await apiFetch(`/changes/${changeId}/transition?target_status=in_review`, {
+    method: "POST",
+  });
+  if (targetStatus === "in_review") return;
+
+  // Assign Bob as reviewer and have him approve
+  await apiFetch(`/changes/${changeId}/reviewers`, {
+    method: "POST",
+    body: JSON.stringify({ reviewer_name: "Bob Reviewer" }),
+  });
+  const reviewsRes = await apiFetchAs(bob, `/changes/${changeId}/reviewers`);
+  const reviews = await reviewsRes.json();
+  await apiFetchAs(
+    bob,
+    `/changes/${changeId}/reviewers/${reviews[0].id}/decision`,
+    { method: "POST", body: JSON.stringify({ decision: "approved" }) },
+  );
+
+  // in_review → approved
+  await apiFetch(`/changes/${changeId}/transition?target_status=approved`, {
+    method: "POST",
+  });
+  if (targetStatus === "approved") return;
+
+  // approved → executing
+  await apiFetch(`/changes/${changeId}/transition?target_status=executing`, {
+    method: "POST",
+  });
+  if (targetStatus === "executing") return;
+
+  // executing → done: complete all checklist items first
+  const itemsRes = await apiFetch(`/changes/${changeId}/checklist`);
+  const items = await itemsRes.json();
+  for (const item of items) {
+    await apiFetch(`/changes/${changeId}/checklist/${item.id}/complete`, {
+      method: "POST",
+      body: JSON.stringify({ observed_result: "OK", status: "completed" }),
+    });
+  }
+  await apiFetch(`/changes/${changeId}/transition?target_status=done`, {
+    method: "POST",
+  });
 }
 
 export const USERS = {

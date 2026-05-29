@@ -149,12 +149,12 @@ test.describe.serial("Change lifecycle", () => {
     await page.goto(`/changes/${changeId}`);
     await page.waitForLoadState("networkidle");
 
-    // Transition from in_review to approved
+    // Transition from in_review to approved — all reviews are approved,
+    // so this button must be visible. Assert it, don't conditionally handle it.
     const approveBtn = page.getByRole("button", { name: "Approve" });
-    if (await approveBtn.isVisible()) {
-      await approveBtn.click();
-      await page.waitForTimeout(500);
-    }
+    await expect(approveBtn).toBeVisible();
+    await approveBtn.click();
+    await page.waitForTimeout(500);
 
     // Start execution
     await page.getByRole("button", { name: "Start Execution" }).click();
