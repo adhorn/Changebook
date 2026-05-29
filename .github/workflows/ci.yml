@@ -142,7 +142,11 @@ jobs:
       # Playwright's webServer config starts both backend (port 8001) and
       # frontend (port 3001) with the correct DB URL and CORS settings.
       # No manual server management needed here.
-      - run: npx playwright test --reporter=github
+      #
+      # Reporters: "list" prints each test name and pass/fail status to the
+      # log (so the run is legible at a glance); "github" adds inline
+      # annotations on failures.
+      - run: npx playwright test --reporter=list,github
         working-directory: frontend
       - uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
