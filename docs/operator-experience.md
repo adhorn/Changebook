@@ -150,6 +150,20 @@ If the item is a hold point, execution pauses BEFORE the step can run. A second 
 
 If the observed result does not match the expected outcome, the operator has a clear choice: continue (with justification), pause (wait for guidance), or abort (trigger rollback).
 
+### Hold-point UX: considered and rejected alternatives
+
+A few approaches were tried and reverted during the verify-before redesign. Recording them so the rationale is not re-litigated:
+
+- **Hiding the command until verification** — rejected. The verifier needs to read the command to do their job. Hiding it would defeat the purpose of the second pair of eyes.
+- **Locking the copy button** — rejected. Operators routinely paste commands into remote terminals (Slack, screen-share). Locking copy adds friction to a normal collaboration pattern without strengthening the underlying control.
+- **Disabling text selection on the command** — rejected for the same reason as above, plus it broke standard browser ergonomics.
+
+What we kept: the **Complete button is the gate**. It is absent until verification is recorded. The backend enforces this regardless of what the UI shows.
+
+The verification itself is **honor-system by design**. The operator types the verifier's name in the UI; nobody else needs to log in. The two-person rule is a cognitive forcing function — a moment of shared attention before an action runs — not a technical control. The integrity guard at completion time (completer must differ from verifier) catches the obvious mistake; everything stronger requires real identity, which arrives with #39.
+
+See `docs/permissions.md` for the authoritative table of who can call which endpoint.
+
 ### Why read-do
 
 This is the forcing function against omission. Under pressure, operators skip steps, batch actions, stop reading. The sequential unlock prevents this. The read-back (recording observations) prevents "check the box without looking" — the operator must engage with the result.
