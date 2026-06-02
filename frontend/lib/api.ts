@@ -99,6 +99,8 @@ export interface ChecklistItem {
   expected_outcome: string | null;
   rollback_action: string | null;
   is_hold_point: boolean;
+  hold_point_verified_by: string | null;
+  hold_point_verified_at: string | null;
   added_during_execution: boolean;
   created_at: string;
   completion: ChecklistCompletion | null;
@@ -111,8 +113,6 @@ export interface ChecklistCompletion {
   status: "completed" | "flagged" | "skipped_with_justification";
   completed_by: string;
   completed_at: string;
-  hold_point_verified_by: string | null;
-  hold_point_verified_at: string | null;
 }
 
 export interface Review {
