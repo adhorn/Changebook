@@ -26,7 +26,7 @@ Changebook is grounded in cognitive systems engineering (CSE) — the same disci
 
 **Cognitive forcing functions.** The pre-flight questions don't score risk or make decisions. They force the operator to think before acting. *What happens if this fails? What's the blast radius? How do you roll back, and how long does it take?* The section ordering is deliberate: what you're doing, then who it affects, then what happens if it goes wrong. That sequence walks the operator through a mental simulation of the change before a single command runs.
 
-**Common ground, not gatekeeping.** Reviewers see everything the author sees — pre-flight answers, the full checklist, the maintenance window. The review isn't an approval stamp. It's two people building shared understanding of what's about to happen. Hold points are the sharpest version: the operator cannot copy or complete the step until a second person reads the command and verifies it should run — two minds on the same screen before the action.
+**Common ground, not gatekeeping.** Reviewers see everything the author sees — pre-flight answers, the full checklist, the maintenance window. The review isn't an approval stamp. It's two people building shared understanding of what's about to happen. Hold points are the sharpest version: a second person reads the command and verifies the step should run before the operator can complete it — two minds in agreement before the action.
 
 **Show, don't decide.** During execution, the operator sees the maintenance window, the expected outcome for each step, the rollback action. The completion form asks *"what did you observe?"* — not *"did it pass?"* There's no green/red traffic light. The operator records what happened and decides whether to proceed.
 

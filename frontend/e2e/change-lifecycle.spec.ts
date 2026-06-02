@@ -186,17 +186,10 @@ test.describe.serial("Change lifecycle", () => {
     // Complete first execution item
     await completeNextItem("redis_version:7.4.0");
 
-    // The next item is a hold point — it should be blocked from completion.
-    // The command IS visible (the verifier must be able to read it before signing off),
-    // but copy is locked and the Complete button is not available.
+    // The next item is a hold point — blocked from completion.
+    // The command is visible and copyable; the Complete button is not present yet.
     await expect(page.getByText("A second person must verify")).toBeVisible();
     await expect(page.getByText("redis-cli CLUSTER NODES")).toBeVisible();
-    await expect(
-      page.getByRole("button", {
-        name: /Copy locked — a second person must verify this hold point first/,
-      }),
-    ).toBeVisible();
-    // No "Complete this item" button should be present yet
     await expect(page.getByRole("button", { name: "Complete this item" })).not.toBeVisible();
   });
 
@@ -219,12 +212,7 @@ test.describe.serial("Change lifecycle", () => {
     await page.getByRole("button", { name: "Confirm" }).click();
     await page.waitForTimeout(1000);
 
-    // Copy is now unlocked (lock-titled button is gone) and the hold-point item can be completed
-    await expect(
-      page.getByRole("button", {
-        name: /Copy locked — a second person must verify this hold point first/,
-      }),
-    ).not.toBeVisible();
+    // The hold-point item can now be completed
     await expect(page.getByRole("button", { name: "Complete this item" })).toBeVisible();
   });
 

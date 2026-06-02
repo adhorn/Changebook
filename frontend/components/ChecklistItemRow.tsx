@@ -124,14 +124,13 @@ export default function ChecklistItemRow({
   }
 
   // Hold-point verification happens BEFORE the step runs (verify-before).
-  // The command stays VISIBLE (the verifier must be able to read it),
-  // but copy is disabled until a second person verifies.
+  // The command is fully visible and copyable — the verifier needs to read
+  // it, the operator may need to paste it into a remote session. The
+  // forcing function is the Complete button being locked until verification.
   const isUnverifiedHoldPoint =
     item.is_hold_point && !item.hold_point_verified_by;
   const needsHoldVerification =
     isNext && isExecuting && isUnverifiedHoldPoint && !isCompleted;
-  const copyDisabledForVerification =
-    isNext && isExecuting && isUnverifiedHoldPoint && !!item.command;
 
   // --- Edit mode rendering ---
   if (editing) {
@@ -269,11 +268,7 @@ export default function ChecklistItemRow({
               >
                 {item.command}
               </pre>
-              <CopyButton
-                text={item.command}
-                disabled={copyDisabledForVerification}
-                disabledTitle="Copy locked — a second person must verify this hold point first"
-              />
+              <CopyButton text={item.command} />
             </div>
           )}
           {item.expected_outcome && !showComplete && (
@@ -349,7 +344,7 @@ export default function ChecklistItemRow({
               {!showVerify ? (
                 <div className="mt-2">
                   <p className="text-xs text-amber-700 mb-1">
-                    A second person must verify this hold point. The command is shown — they should read it and confirm the step should run. Copy is locked until then.
+                    A second person must verify this hold point before the step can be completed. They should read the command and confirm the action should be taken.
                   </p>
                   <button
                     onClick={() => { setShowVerify(true); setError(null); }}
