@@ -126,6 +126,18 @@ AUTHOR_ONLY_EXECUTION_ENDPOINTS = [
         lambda f: f"/api/v1/changes/{f['change_id']}/checklist/execution-step",
         {"insert_after_item_id": "00000000-0000-0000-0000-000000000000", "description": "new step"},
     ),
+    (
+        "POST /changes/{id}/checklist/{item_id}/hold-point-verify",
+        "post",
+        # The item may or may not actually be a hold point — we only care
+        # about the AUTH boundary here. If the item isn't a hold point we
+        # get 422 (not 403), which still demonstrates the auth check did
+        # not reject the call.
+        lambda f: (
+            f"/api/v1/changes/{f['change_id']}/checklist/{f['execution_item_id']}/hold-point-verify"
+        ),
+        {"verified_by": "Some Verifier"},
+    ),
 ]
 
 ANY_AUTHENTICATED_CHANGE_ENDPOINTS = [
@@ -143,20 +155,11 @@ ANY_AUTHENTICATED_CHANGE_ENDPOINTS = [
     ),
 ]
 
-ANY_AUTHENTICATED_EXECUTION_ENDPOINTS = [
-    (
-        "POST /changes/{id}/checklist/{item_id}/hold-point-verify",
-        "post",
-        # The item may or may not actually be a hold point — we only care
-        # about the AUTH boundary here. If the item isn't a hold point we
-        # get 422 (not 403), which still demonstrates the auth check did
-        # not reject the call.
-        lambda f: (
-            f"/api/v1/changes/{f['change_id']}/checklist/{f['execution_item_id']}/hold-point-verify"
-        ),
-        {"verified_by": "Some Verifier"},
-    ),
-]
+# No "any authenticated" execution-time endpoints today — all execution
+# actions are author-only, including hold-point verification (the operator
+# at the keyboard types the verifier's name). Kept as a named slot so it's
+# clear where a future endpoint of that kind would be registered.
+ANY_AUTHENTICATED_EXECUTION_ENDPOINTS: list = []
 
 
 def _do_request(client, method, url, body, headers=None):
@@ -239,18 +242,6 @@ def test_author_only_execution_endpoint_rejects_non_author(
     )
 
 
-@pytest.mark.parametrize(
-    "label,method,path_fn,body",
-    ANY_AUTHENTICATED_EXECUTION_ENDPOINTS,
-    ids=lambda v: v if isinstance(v, str) else "",
-)
-def test_any_authenticated_execution_endpoint_allows_non_author(
-    label, method, path_fn, body, client, executing_change
-):
-    """Hold-point verification is intentionally open to any authenticated
-    user. The verifier is a typed name, not derived from auth."""
-    url = path_fn(executing_change)
-    resp = _do_request(client, method, url, body, headers=BOB)
-    assert resp.status_code != 403, (
-        f"{label}: non-author was unexpectedly rejected with 403: {resp.text}"
-    )
+# If ANY_AUTHENTICATED_EXECUTION_ENDPOINTS ever has rows, restore the
+# parametrized test "test_any_authenticated_execution_endpoint_allows_non_author"
+# from git history. Today the bucket is empty by design.

@@ -160,7 +160,7 @@ A few approaches were tried and reverted during the verify-before redesign. Reco
 
 What we kept: the **Complete button is the gate**. It is absent until verification is recorded. The backend enforces this regardless of what the UI shows.
 
-The verification itself is **honor-system by design**. The operator types the verifier's name in the UI; nobody else needs to log in. The two-person rule is a cognitive forcing function — a moment of shared attention before an action runs — not a technical control. The integrity guard at completion time (completer must differ from verifier) catches the obvious mistake; everything stronger requires real identity, which arrives with #39.
+The verification itself is **honor-system in its content**, but **author-only at the API boundary**. The operator (currently the change author) is at the keyboard and types the verifier's name. The verifier is beside them, reading the screen. Nobody else logs in. The two-person rule is a cognitive forcing function — a moment of shared attention before an action runs — not a separate authentication step. The integrity guard at completion time (completer must differ from verifier) catches the obvious mistake; everything stronger requires real identity, which arrives with #39.
 
 See `docs/permissions.md` for the authoritative table of who can call which endpoint.
 

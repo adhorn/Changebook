@@ -24,7 +24,7 @@ The parametrized test in `backend/tests/test_permission_matrix.py` walks this ta
 | `PATCH /changes/{id}/checklist/{item_id}` | author | 403 | Edit a checklist item. |
 | `DELETE /changes/{id}/checklist/{item_id}` | author | 403 | Delete a checklist item. |
 | `POST /changes/{id}/checklist/{item_id}/complete` | author | 403 | The author is the operator. Recording observed results during execution is the author's act. |
-| `POST /changes/{id}/checklist/{item_id}/hold-point-verify` | any authenticated | n/a | **Honor system — see note below.** |
+| `POST /changes/{id}/checklist/{item_id}/hold-point-verify` | author | 403 | The operator at the keyboard records the verifier's name. **See note on the honor system below.** |
 | `POST /changes/{id}/checklist/execution-step` | author | 403 | Adding a step during execution is part of the operator's actions and stays with the author. |
 | `POST /changes/{id}/reviewers` | author | 403 | The author assigns reviewers to their own change. |
 | `POST /changes/{id}/reviewers/{review_id}/decision` | assigned reviewer | 403 | Only the user named as the reviewer can submit that review. The author cannot self-review (separately enforced with 422). |
@@ -37,12 +37,14 @@ The parametrized test in `backend/tests/test_permission_matrix.py` walks this ta
 
 ## Note on hold-point verification
 
-`POST /changes/{id}/checklist/{item_id}/hold-point-verify` is intentionally callable by any authenticated user. The verifier's name is supplied in the request body as plain text — not derived from authentication. This is a deliberate design choice:
+The `/hold-point-verify` endpoint is **author-only**, like every other execution-time action. The verifier does not log in separately.
 
-- The two-person rule is a **cognitive forcing function**, not a technical control. It exists to ensure a moment of shared attention before the action runs.
-- In practice the operator is at the keyboard and the verifier is physically beside them, reading the screen. The operator types the verifier's name. Requiring the verifier to log in separately would add friction without strengthening the underlying control.
-- The actual integrity guard is enforced at completion time: `complete_item` rejects completions where `completed_by == verified_by` (a different person must complete than verified).
+This is a deliberate split between *who calls the endpoint* and *what the call records*:
 
-This is analogous to aviation CRM: the captain reads, the first officer confirms verbally, neither logs into a system to do so. The cognitive moment is what matters.
+- **Who calls it**: the executor (currently the change author). They are at the keyboard during execution. Other authenticated users have no business recording verifications on a change they are not running.
+- **What it records**: the verifier's name, typed in by the operator as plain text. The verifier is physically beside the operator, reading the screen and confirming the step should run. This is the **honor system** — the moment of shared attention is the cognitive forcing function, not a separate login.
+- **Integrity guard**: at completion time, `complete_item` rejects completions where `completed_by == verified_by`. A different name must be on each side. This is the technical check; the operator-and-verifier-in-the-room is the social one.
 
-When real authentication and roles arrive (#39), this design choice should be revisited but is unlikely to change.
+This is analogous to aviation CRM: the captain reads, the first officer confirms verbally, neither logs into a system to do so. The cognitive moment is what matters, but the captain is still the one operating the controls.
+
+When real authentication and roles arrive (#39), the matrix may evolve so that a "designated operator" distinct from the author can drive execution. The honor-system content of the verify call is unlikely to change.
