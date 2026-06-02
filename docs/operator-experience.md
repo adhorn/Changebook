@@ -132,7 +132,7 @@ The doing phase. An ordered list of discrete items. Each item is one command or 
 - **Command/script**: the exact command to copy and paste (optional but encouraged)
 - **Expected outcome**: what should happen when this command runs
 - **Rollback action**: what to do if this step fails
-- **Hold point flag**: if set, execution pauses here until an independent verifier confirms before proceeding
+- **Hold point flag**: if set, the step cannot be completed until an independent verifier authorizes it — a second person must read the command and verify before the operator can record completion
 
 ### Execution model: read-do
 
@@ -146,7 +146,7 @@ Items are executed sequentially. One at a time. The operator:
 4. Confirms the item is complete
 5. Only then does the next item unlock
 
-If the item is a hold point, execution pauses after the operator's confirmation. A designated verifier must independently confirm before the next item unlocks.
+If the item is a hold point, execution pauses BEFORE the step can run. A second person reads the command, confirms the action should be taken, and verifies. Only then can the operator record completion. Completer must be a different person than the verifier (two-person rule).
 
 If the observed result does not match the expected outcome, the operator has a clear choice: continue (with justification), pause (wait for guidance), or abort (trigger rollback).
 
@@ -226,7 +226,7 @@ This prevents "I got approval and then quietly changed the plan." It's a strong 
    The operator works through all three checklists sequentially:
    pre-flight checks first, then execution steps, then verification.
    One item at a time. Sequential unlock. Read-back on each.
-   Hold points pause for independent verification.
+   Hold points require independent verification before the step can run.
    Can pause and resume. Can abort at any point.
 
 5. DONE
@@ -305,6 +305,8 @@ First-class entity. Has a name, platform, description. Optionally linked to a cu
 - expected_outcome (what should happen)
 - rollback_action (what to do if it fails — execution and pre-flight phases)
 - is_hold_point (boolean)
+- hold_point_verified_by (set before completion, if hold point)
+- hold_point_verified_at (set before completion, if hold point)
 - phase (pre_flight / execution / verification)
 
 ### Checklist completion (recorded during execution)
@@ -313,8 +315,6 @@ First-class entity. Has a name, platform, description. Optionally linked to a cu
 - status (completed / flagged / skipped_with_justification)
 - completed_by
 - completed_at
-- hold_point_verified_by (if hold point)
-- hold_point_verified_at (if hold point)
 
 ### Review
 - reviewer (who)

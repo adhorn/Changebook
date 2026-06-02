@@ -249,10 +249,15 @@ class TestPhaseGating:
 
 
 class TestHoldPoints:
-    """Hold points require second-person verification before proceeding."""
+    """Hold points require second-person verification BEFORE the step runs.
 
-    def test_hold_point_blocks_next_item(self, client, sample_change_data):
-        """After completing a hold-point item, the next item is blocked until verified."""
+    The verification authorizes the action. Until verified, the item cannot
+    be completed. The completer must be a different person than the verifier
+    (two-person rule).
+    """
+
+    def test_unverified_hold_point_cannot_be_completed(self, client, sample_change_data):
+        """A hold-point item is blocked from completion until a second person verifies."""
         items_def = {
             "pre_flight": [{"description": "Pre-flight check"}],
             "execution": [
@@ -263,76 +268,47 @@ class TestHoldPoints:
         }
         change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
 
-        # Complete pre-flight
+        # Complete pre-flight (not a hold point) — fine
         client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
-            json={
-                "observed_result": "OK",
-                "status": "completed",
-            },
+            json={"observed_result": "OK", "status": "completed"},
         )
 
-        # Complete the hold-point item
-        client.post(
-            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
-            json={
-                "observed_result": "Config applied",
-                "status": "completed",
-            },
-        )
-
-        # Try next item — blocked, hold point not verified
+        # Try to complete the hold-point item with no verification — blocked
         resp = client.post(
-            f"/api/v1/changes/{change_id}/checklist/{items['execution'][1]['id']}/complete",
-            json={
-                "observed_result": "Restarted",
-                "status": "completed",
-            },
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
+            json={"observed_result": "Config applied", "status": "completed"},
         )
         assert resp.status_code == 422
         assert "hold" in resp.json()["detail"].lower()
 
-    def test_hold_point_verification(self, client, sample_change_data):
-        """A second person can verify a hold point."""
+    def test_hold_point_verification_before_completion(self, client, sample_change_data):
+        """A second person verifies a hold point before any completion exists."""
         items_def = {
             "pre_flight": [{"description": "Pre-flight check"}],
             "execution": [
                 {"description": "Apply config", "is_hold_point": True},
-                {"description": "Restart service"},
             ],
             "verification": [{"description": "Check health"}],
         }
         change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
 
-        # Complete pre-flight
-        client.post(
-            f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
-            json={
-                "observed_result": "OK",
-                "status": "completed",
-            },
-        )
-
-        # Complete the hold-point item
-        client.post(
-            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
-            json={
-                "observed_result": "Config applied",
-                "status": "completed",
-            },
-        )
-
-        # Verify the hold point — operator types the verifier's name
+        # Verify with no completion yet — this is the normal flow
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
             json={"verified_by": "Jane Smith"},
         )
         assert resp.status_code == 200
+        # Verified fields live on the item now (not the completion)
         assert resp.json()["hold_point_verified_by"] == "Jane Smith"
         assert resp.json()["hold_point_verified_at"] is not None
+        # No completion has happened yet
+        assert resp.json()["completion"] is None
 
-    def test_hold_point_verified_unlocks_next(self, client, sample_change_data):
-        """After hold-point verification, the next item unlocks."""
+    def test_verified_hold_point_can_be_completed_and_unlocks_next(
+        self, client, sample_change_data
+    ):
+        """After verification, the hold-point item can be completed and the next item unlocks."""
         items_def = {
             "pre_flight": [{"description": "Pre-flight check"}],
             "execution": [
@@ -343,52 +319,34 @@ class TestHoldPoints:
         }
         change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
 
-        # Complete pre-flight
         client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
-            json={
-                "observed_result": "OK",
-                "status": "completed",
-            },
+            json={"observed_result": "OK", "status": "completed"},
         )
 
-        # Complete hold-point item
-        client.post(
-            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
-            json={
-                "observed_result": "Config applied",
-                "status": "completed",
-            },
-        )
-
-        # Verify hold point — operator types the verifier's name
+        # Verify the hold point first
         client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
             json={"verified_by": "Jane Smith"},
         )
 
-        # Now next item should unlock
+        # Now completion is allowed
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
+            json={"observed_result": "Config applied", "status": "completed"},
+        )
+        assert resp.status_code == 200
+
+        # Next item proceeds normally
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][1]['id']}/complete",
-            json={
-                "observed_result": "Service restarted, PID 4821",
-                "status": "completed",
-            },
+            json={"observed_result": "Service restarted, PID 4821", "status": "completed"},
         )
         assert resp.status_code == 200
 
     def test_cannot_verify_non_hold_point(self, client, sample_change_data):
         """Verifying a non-hold-point item is an error."""
         change_id, items = _create_executing_change(client, sample_change_data)
-
-        # Complete first item (not a hold point)
-        client.post(
-            f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
-            json={
-                "observed_result": "OK",
-                "status": "completed",
-            },
-        )
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/hold-point-verify",
@@ -397,8 +355,8 @@ class TestHoldPoints:
         assert resp.status_code == 422
         assert "hold" in resp.json()["detail"].lower()
 
-    def test_cannot_verify_uncompleted_hold_point(self, client, sample_change_data):
-        """Cannot verify a hold point that hasn't been completed yet."""
+    def test_cannot_complete_when_completer_matches_verifier(self, client, sample_change_data):
+        """The completer cannot match the verifier — two-person rule, enforced at completion."""
         items_def = {
             "pre_flight": [{"description": "Pre-flight check"}],
             "execution": [
@@ -408,43 +366,48 @@ class TestHoldPoints:
         }
         change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
 
-        resp = client.post(
-            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
-            json={"verified_by": "Jane Smith"},
-        )
-        assert resp.status_code == 422
-
-    def test_cannot_verify_with_same_name_as_completer(self, client, sample_change_data):
-        """The verifier name cannot match the completer — two-person rule."""
-        items_def = {
-            "pre_flight": [{"description": "Pre-flight check"}],
-            "execution": [
-                {"description": "Apply config", "is_hold_point": True},
-                {"description": "Restart service"},
-            ],
-            "verification": [{"description": "Check health"}],
-        }
-        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
-
-        # Complete pre-flight
         client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
             json={"observed_result": "OK", "status": "completed"},
         )
 
-        # Complete the hold-point item (completer is "Test User" from conftest)
+        # Verify the hold point as "Test User" (the same name conftest uses for the completer)
         client.post(
-            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
-            json={"observed_result": "Config applied", "status": "completed"},
-        )
-
-        # Try to verify with the same name as the completer
-        resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
             json={"verified_by": "Test User"},
         )
+
+        # Try to complete — completer (Test User from auth) matches the verifier
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
+            json={"observed_result": "Config applied", "status": "completed"},
+        )
         assert resp.status_code == 422
         assert "different person" in resp.json()["detail"].lower()
+
+    def test_cannot_verify_twice(self, client, sample_change_data):
+        """A hold point cannot be verified more than once."""
+        items_def = {
+            "pre_flight": [{"description": "Pre-flight check"}],
+            "execution": [
+                {"description": "Apply config", "is_hold_point": True},
+            ],
+            "verification": [{"description": "Check health"}],
+        }
+        change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
+
+        # First verification succeeds
+        client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
+            json={"verified_by": "Jane Smith"},
+        )
+
+        # Second one rejected
+        resp = client.post(
+            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",
+            json={"verified_by": "Other Person"},
+        )
+        assert resp.status_code == 409
 
     def test_verified_by_is_required(self, client, sample_change_data):
         """The verified_by field is required — cannot send empty body."""
@@ -456,15 +419,6 @@ class TestHoldPoints:
             "verification": [{"description": "Check health"}],
         }
         change_id, items = _create_executing_change(client, sample_change_data, items=items_def)
-
-        client.post(
-            f"/api/v1/changes/{change_id}/checklist/{items['pre_flight'][0]['id']}/complete",
-            json={"observed_result": "OK", "status": "completed"},
-        )
-        client.post(
-            f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/complete",
-            json={"observed_result": "Config applied", "status": "completed"},
-        )
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/checklist/{items['execution'][0]['id']}/hold-point-verify",

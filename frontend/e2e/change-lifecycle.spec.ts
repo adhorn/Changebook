@@ -68,8 +68,10 @@ test.describe.serial("Change lifecycle", () => {
     await page.getByRole("button", { name: "Add", exact: true }).click();
     await expect(page.getByText("Run Redis upgrade script")).toBeVisible();
 
-    // Second execution item — hold point
+    // Second execution item — hold point with a command
+    // (so the verify-before UX hides the command until verification)
     await page.getByPlaceholder("Description — what to do...").fill("Verify cluster health");
+    await page.getByPlaceholder(/Command/).first().fill("redis-cli CLUSTER NODES | grep -c master");
     // Check the hold point checkbox
     await page.locator('label:has-text("Hold point") input[type="checkbox"]').check();
     await page.getByRole("button", { name: "Add", exact: true }).click();
@@ -184,11 +186,11 @@ test.describe.serial("Change lifecycle", () => {
     // Complete first execution item
     await completeNextItem("redis_version:7.4.0");
 
-    // Complete hold point item (second execution item)
-    await completeNextItem("Cluster nodes all healthy, 0 failed");
-
-    // The hold point should now need verification
+    // The next item is a hold point — blocked from completion.
+    // The command is visible and copyable; the Complete button is not present yet.
     await expect(page.getByText("A second person must verify")).toBeVisible();
+    await expect(page.getByText("redis-cli CLUSTER NODES")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Complete this item" })).not.toBeVisible();
   });
 
   test("verify hold point with two-person rule", async ({ page }) => {
@@ -196,10 +198,10 @@ test.describe.serial("Change lifecycle", () => {
     await page.goto(`/changes/${changeId}`);
     await page.waitForLoadState("networkidle");
 
-    // Click "Verify Hold Point"
+    // Click "Verify Hold Point" — verification happens BEFORE completion
     await page.getByRole("button", { name: "Verify Hold Point" }).click();
 
-    // Try same person — should show client-side error
+    // Try same person (the operator) — should show client-side error
     await page.getByPlaceholder("Name of the person who checked this").fill("Alice Engineer");
     await page.getByRole("button", { name: "Confirm" }).click();
     await expect(page.getByText("Must be a different person")).toBeVisible();
@@ -210,14 +212,23 @@ test.describe.serial("Change lifecycle", () => {
     await page.getByRole("button", { name: "Confirm" }).click();
     await page.waitForTimeout(1000);
 
-    // Hold point should now show verified
-    await expect(page.getByText("Hold point verified by Bob Reviewer")).toBeVisible();
+    // The hold-point item can now be completed
+    await expect(page.getByRole("button", { name: "Complete this item" })).toBeVisible();
   });
 
   test("complete remaining items and mark done", async ({ page }) => {
     await switchUser(page, USERS.alice);
     await page.goto(`/changes/${changeId}`);
     await page.waitForLoadState("networkidle");
+
+    // Complete the verified hold-point item
+    await page.getByRole("button", { name: "Complete this item" }).click();
+    await page.locator("textarea").last().fill("Cluster nodes all healthy, 0 failed");
+    await page.getByRole("button", { name: "Record" }).click();
+    await page.waitForTimeout(1000);
+
+    // Confirm the verified-by line is shown on the completed item
+    await expect(page.getByText("Hold point verified by Bob Reviewer")).toBeVisible();
 
     // Complete the verification phase item
     await page.getByRole("button", { name: "Complete this item" }).click();

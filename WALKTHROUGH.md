@@ -56,7 +56,7 @@ Work through it step by step. For each item you'll see:
 
 Complete each step by recording **what you actually observed**. The system enforces order: you can't skip ahead.
 
-When you hit a **hold point** (marked with a shield icon), execution stops. A second person must verify before you can continue. Switch identity again and verify it.
+When you reach a **hold point** (marked with a shield icon), the step is blocked from completion until a second person verifies. Switch identity, read the command, and verify it. The step can then be completed. Completer must be a different person than the verifier (two-person rule).
 
 ## 5. Verify and close
 

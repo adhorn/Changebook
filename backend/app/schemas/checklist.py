@@ -24,8 +24,6 @@ class ChecklistCompletionResponse(BaseModel):
     status: CompletionStatus
     completed_by: str
     completed_at: datetime
-    hold_point_verified_by: str | None
-    hold_point_verified_at: datetime | None
 
 
 class ChecklistItemResponse(BaseModel):
@@ -40,6 +38,8 @@ class ChecklistItemResponse(BaseModel):
     expected_outcome: str | None
     rollback_action: str | None
     is_hold_point: bool
+    hold_point_verified_by: str | None = None
+    hold_point_verified_at: datetime | None = None
     added_during_execution: bool = False
     created_at: datetime
     completion: ChecklistCompletionResponse | None = None

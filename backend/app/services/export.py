@@ -108,11 +108,11 @@ def render_markdown(db: Session, change: Change) -> str:
                     sections.append(
                         f"   - **By:** {completion.completed_by} at {completion.completed_at}"
                     )
-                    if item.is_hold_point and completion.hold_point_verified_by:
+                    if item.is_hold_point and item.hold_point_verified_by:
                         sections.append(
                             f"   - **Hold point verified by:** "
-                            f"{completion.hold_point_verified_by} "
-                            f"at {completion.hold_point_verified_at}"
+                            f"{item.hold_point_verified_by} "
+                            f"at {item.hold_point_verified_at}"
                         )
                 else:
                     sections.append(f"{item.order}. ⬜{added} {item.description}{hold}")

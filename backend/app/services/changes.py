@@ -348,13 +348,12 @@ def transition_status(
                 f"Cannot mark done — {len(incomplete)} checklist item(s) not completed. "
                 f"All items must be completed before marking a change as done."
             )
-        # Also check hold points are verified
+        # Sanity net for legacy data: under verify-before, completion is
+        # gated by verification, so this should be empty for new data.
         unverified = [
             i
             for i in all_items
-            if i.is_hold_point
-            and i.completion is not None
-            and i.completion.hold_point_verified_by is None
+            if i.is_hold_point and i.completion is not None and i.hold_point_verified_by is None
         ]
         if unverified:
             raise GateError(

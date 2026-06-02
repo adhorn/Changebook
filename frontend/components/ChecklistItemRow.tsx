@@ -103,8 +103,11 @@ export default function ChecklistItemRow({
       setError("Enter the name of the person who verified this step.");
       return;
     }
-    if (verifierName.trim() === completion?.completed_by) {
-      setError(`Must be a different person than ${completion.completed_by}.`);
+    if (verifierName.trim() === currentUserName) {
+      setError(
+        `Must be a different person than the operator (${currentUserName}). ` +
+          "Hand the screen to a colleague to confirm.",
+      );
       return;
     }
     setSubmitting(true);
@@ -120,8 +123,14 @@ export default function ChecklistItemRow({
     setSubmitting(false);
   }
 
+  // Hold-point verification happens BEFORE the step runs (verify-before).
+  // The command is fully visible and copyable — the verifier needs to read
+  // it, the operator may need to paste it into a remote session. The
+  // forcing function is the Complete button being locked until verification.
+  const isUnverifiedHoldPoint =
+    item.is_hold_point && !item.hold_point_verified_by;
   const needsHoldVerification =
-    isCompleted && item.is_hold_point && !completion?.hold_point_verified_by;
+    isNext && isExecuting && isUnverifiedHoldPoint && !isCompleted;
 
   // --- Edit mode rendering ---
   if (editing) {
@@ -321,21 +330,21 @@ export default function ChecklistItemRow({
               >
                 {completion.observed_result}
               </pre>
-              {completion.hold_point_verified_by && (
+              {item.is_hold_point && item.hold_point_verified_by && (
                 <p className="text-green-700">
-                  Hold point verified by {completion.hold_point_verified_by}
+                  Hold point verified by {item.hold_point_verified_by}
                 </p>
               )}
             </div>
           )}
 
-          {/* Hold point verification */}
-          {needsHoldVerification && isExecuting && (
+          {/* Hold point verification — appears BEFORE completion is possible */}
+          {needsHoldVerification && (
             <>
               {!showVerify ? (
                 <div className="mt-2">
                   <p className="text-xs text-amber-700 mb-1">
-                    A second person must verify this hold point before proceeding.
+                    A second person must verify this hold point before the step can be completed. They should read the command and confirm the action should be taken.
                   </p>
                   <button
                     onClick={() => { setShowVerify(true); setError(null); }}
@@ -389,7 +398,7 @@ export default function ChecklistItemRow({
           )}
 
           {/* Complete button */}
-          {isNext && isExecuting && !isCompleted && (
+          {isNext && isExecuting && !isCompleted && !isUnverifiedHoldPoint && (
             <>
               {!showComplete ? (
                 <button
