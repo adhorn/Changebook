@@ -124,12 +124,13 @@ export default function ChecklistItemRow({
   }
 
   // Hold-point verification happens BEFORE the step runs (verify-before).
-  // The command stays hidden until a second person verifies.
+  // The command stays VISIBLE (the verifier must be able to read it),
+  // but copy is disabled until a second person verifies.
   const isUnverifiedHoldPoint =
     item.is_hold_point && !item.hold_point_verified_by;
   const needsHoldVerification =
     isNext && isExecuting && isUnverifiedHoldPoint && !isCompleted;
-  const commandHiddenForVerification =
+  const copyDisabledForVerification =
     isNext && isExecuting && isUnverifiedHoldPoint && !!item.command;
 
   // --- Edit mode rendering ---
@@ -255,13 +256,7 @@ export default function ChecklistItemRow({
               </div>
             )}
           </div>
-          {commandHiddenForVerification && (
-            <div className="mt-1 p-2 bg-amber-50/40 border border-dashed border-amber-300 rounded text-xs text-amber-800">
-              <span className="font-medium">Command hidden — hold point.</span>{" "}
-              The command will be revealed once a second person verifies below.
-            </div>
-          )}
-          {item.command && !commandHiddenForVerification && (
+          {item.command && (
             <div className="relative mt-1 group/cmd">
               <pre
                 className="bg-gray-50 rounded p-2 pr-10 text-xs font-mono text-gray-700 overflow-x-auto"
@@ -274,7 +269,11 @@ export default function ChecklistItemRow({
               >
                 {item.command}
               </pre>
-              <CopyButton text={item.command} />
+              <CopyButton
+                text={item.command}
+                disabled={copyDisabledForVerification}
+                disabledTitle="Copy locked — a second person must verify this hold point first"
+              />
             </div>
           )}
           {item.expected_outcome && !showComplete && (
@@ -350,7 +349,7 @@ export default function ChecklistItemRow({
               {!showVerify ? (
                 <div className="mt-2">
                   <p className="text-xs text-amber-700 mb-1">
-                    A second person must verify this hold point before the step can run.
+                    A second person must verify this hold point. The command is shown — they should read it and confirm the step should run. Copy is locked until then.
                   </p>
                   <button
                     onClick={() => { setShowVerify(true); setError(null); }}

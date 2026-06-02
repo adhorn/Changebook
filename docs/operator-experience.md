@@ -132,7 +132,7 @@ The doing phase. An ordered list of discrete items. Each item is one command or 
 - **Command/script**: the exact command to copy and paste (optional but encouraged)
 - **Expected outcome**: what should happen when this command runs
 - **Rollback action**: what to do if this step fails
-- **Hold point flag**: if set, the step cannot be run until an independent verifier authorizes it — the command is hidden until verification
+- **Hold point flag**: if set, the step cannot be completed until an independent verifier authorizes it — the command is visible (the verifier needs to read it) but the copy button is locked until verification
 
 ### Execution model: read-do
 
@@ -146,7 +146,7 @@ Items are executed sequentially. One at a time. The operator:
 4. Confirms the item is complete
 5. Only then does the next item unlock
 
-If the item is a hold point, execution pauses BEFORE the step can run. The command is hidden until a second person independently confirms the action should be taken — only then is the command revealed and the operator can complete the step. Completer must be a different person than the verifier (two-person rule).
+If the item is a hold point, execution pauses BEFORE the step can run. The command is visible — the verifier must be able to read it to do their job — but the copy button is locked and the operator cannot record completion. A second person reads the command, confirms it should be run, and verifies. Only then does copy unlock and the operator can complete the step. Completer must be a different person than the verifier (two-person rule).
 
 If the observed result does not match the expected outcome, the operator has a clear choice: continue (with justification), pause (wait for guidance), or abort (trigger rollback).
 

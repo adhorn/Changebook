@@ -56,7 +56,7 @@ Work through it step by step. For each item you'll see:
 
 Complete each step by recording **what you actually observed**. The system enforces order: you can't skip ahead.
 
-When you reach a **hold point** (marked with a shield icon), the command is hidden — execution cannot proceed until a second person verifies. Switch identity and verify it. The command is then revealed and the step can be run. Completer must be a different person than the verifier (two-person rule).
+When you reach a **hold point** (marked with a shield icon), the copy button is locked — the operator can see the command but cannot copy or complete the step until a second person verifies. Switch identity, read the command, and verify it. Copy then unlocks and the step can be run. Completer must be a different person than the verifier (two-person rule).
 
 ## 5. Verify and close
 
