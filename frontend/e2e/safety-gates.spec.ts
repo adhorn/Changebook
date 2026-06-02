@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import {
   apiFetch,
+  apiFetchAs,
   createChangeViaAPI,
   driveChangeToStatus,
   ensureCustomer,
@@ -117,6 +118,51 @@ test.describe.serial("Safety gates", () => {
     await expect(page.getByRole("button", { name: "Edit Change Details" })).not.toBeVisible();
     await expect(page.getByRole("button", { name: "+ Add item" })).not.toBeVisible();
     await expect(page.getByRole("button", { name: "Submit for Review" })).not.toBeVisible();
+  });
+
+  test("Bob cannot complete or insert steps on Alice's executing change", async () => {
+    // Author is Alice (the default for createChangeViaAPI). Drive the change
+    // all the way to executing.
+    const changeId = await createChangeViaAPI({
+      title: "E2E: Gate — execution author enforcement",
+      checklist: true,
+      preflight: true,
+    });
+    await driveChangeToStatus(changeId, "executing");
+
+    // Find the next item Bob would try to complete.
+    const itemsRes = await apiFetch(`/changes/${changeId}/checklist`);
+    const items = await itemsRes.json();
+    const firstItemId = items[0].id;
+
+    // Bob attempts to complete the item as himself — expect 403.
+    let rejected = false;
+    try {
+      await apiFetchAs(USERS.bob, `/changes/${changeId}/checklist/${firstItemId}/complete`, {
+        method: "POST",
+        body: JSON.stringify({ observed_result: "Bob did this", status: "completed" }),
+      });
+    } catch (err) {
+      rejected = err instanceof Error && err.message.includes("403");
+    }
+    expect(rejected, "Bob should get 403 when completing an item on Alice's change").toBe(true);
+
+    // Bob attempts to insert an execution step — expect 403.
+    rejected = false;
+    try {
+      await apiFetchAs(USERS.bob, `/changes/${changeId}/checklist/execution-step`, {
+        method: "POST",
+        body: JSON.stringify({
+          insert_after_item_id: firstItemId,
+          description: "Bob's inserted step",
+        }),
+      });
+    } catch (err) {
+      rejected = err instanceof Error && err.message.includes("403");
+    }
+    expect(rejected, "Bob should get 403 when adding an execution step on Alice's change").toBe(
+      true,
+    );
   });
 
   test("done changes have no transition buttons", async ({ page }) => {

@@ -432,6 +432,7 @@ def complete_checklist_item(
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
 
     item = change_service.get_checklist_item(db, change_id, item_id)
     if not item:
@@ -457,6 +458,10 @@ def verify_hold_point(
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    # The executor (author) is at the keyboard and types the verifier's
+    # name. The verifier doesn't log in themselves — the honor-system
+    # applies to the content, not the caller.
+    _require_author(user, change)
 
     item = change_service.get_checklist_item(db, change_id, item_id)
     if not item:
@@ -483,6 +488,7 @@ def add_execution_step(
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
 
     insert_after_item = change_service.get_checklist_item(
         db, change_id, payload.insert_after_item_id
