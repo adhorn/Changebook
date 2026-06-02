@@ -1,11 +1,14 @@
 import os
 
-# Skip Alembic migrations in app startup — tests manage their own schema
+# Skip Alembic migrations in app startup — the suite manages its own
+# schema via a session-scoped fixture below.
 os.environ["TESTING"] = "1"
 
 import pytest
+from alembic import command
+from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from app.core.database import get_db
@@ -22,12 +25,56 @@ engine = create_engine(SQLALCHEMY_TEST_URL)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
-@pytest.fixture(autouse=True)
-def setup_db():
-    """Create all tables before each test, drop after."""
-    Base.metadata.create_all(bind=engine)
+# PostgreSQL enum types created by the models — listed once so the migration
+# tests and the cleanup logic agree on what needs dropping with CASCADE.
+_ENUM_TYPES = ("changestatus", "checklistphase", "completionstatus", "reviewdecision")
+
+
+def _drop_everything(eng) -> None:
+    """Drop all domain tables, alembic_version, and enum types."""
+    with eng.connect() as conn:
+        conn.execute(text("DROP TABLE IF EXISTS alembic_version CASCADE"))
+        conn.commit()
+    Base.metadata.drop_all(bind=eng)
+    with eng.connect() as conn:
+        for enum_name in _ENUM_TYPES:
+            conn.execute(text(f"DROP TYPE IF EXISTS {enum_name} CASCADE"))
+        conn.commit()
+
+
+def _alembic_upgrade_head() -> None:
+    """Apply all migrations to the test database — the same code path the
+    backend uses on startup."""
+    cfg = Config("alembic.ini")
+    cfg.set_main_option("sqlalchemy.url", SQLALCHEMY_TEST_URL)
+    command.upgrade(cfg, "head")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _build_schema_via_migrations():
+    """Build the test database schema by running Alembic to head, once
+    per test session.
+
+    This matches the production startup path (app/main.py runs the same
+    `alembic upgrade head` on startup), so the suite exercises the
+    migration-built schema rather than a `create_all()`-built one.
+    """
+    _drop_everything(engine)
+    _alembic_upgrade_head()
     yield
-    Base.metadata.drop_all(bind=engine)
+    _drop_everything(engine)
+
+
+@pytest.fixture(autouse=True)
+def _clean_tables():
+    """Truncate all domain tables before each test, keeping the schema
+    (and alembic_version) intact."""
+    tables = [f'"{t.name}"' for t in Base.metadata.sorted_tables]
+    if tables:
+        with engine.connect() as conn:
+            conn.execute(text(f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE"))
+            conn.commit()
+    yield
 
 
 @pytest.fixture

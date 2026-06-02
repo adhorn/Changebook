@@ -125,7 +125,9 @@ alembic revision --autogenerate -m "describe the change"
 alembic upgrade head
 ```
 
-CI runs `alembic check` and fails the PR if a model change has no matching migration. Note that the test suite uses `create_all()` for speed, so **tests will not catch a missing migration** — `alembic check` is the guard.
+CI runs `alembic check` and fails the PR if a model change has no matching migration.
+
+The test suite constructs its schema by running `alembic upgrade head` once per session, then truncates tables between tests. This means unit tests exercise the same schema-construction path the backend uses on startup — so a migration that diverges from the models will surface in test failures as well as in `alembic check`.
 
 ## Reporting bugs
 

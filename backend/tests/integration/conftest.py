@@ -7,6 +7,11 @@ These tests require a running Postgres instance. Locally, use:
 Then run:
 
     pytest tests/integration -v
+
+Schema construction and per-test cleanup are handled by the parent
+conftest (`tests/conftest.py`) via the session-scoped Alembic fixture
+and the per-test TRUNCATE fixture. This module only adds Postgres-
+specific session and client wiring.
 """
 
 import os
@@ -18,7 +23,6 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.database import get_db
 from app.main import app
-from app.models import Base
 
 POSTGRES_URL = os.environ.get(
     "CHANGEBOOK_TEST_DATABASE_URL",
@@ -32,17 +36,6 @@ def pg_engine():
     engine = create_engine(POSTGRES_URL)
     yield engine
     engine.dispose()
-
-
-@pytest.fixture(autouse=True)
-def setup_db(pg_engine):
-    """Create all tables before each test, drop after.
-
-    Each test gets a clean database.
-    """
-    Base.metadata.create_all(bind=pg_engine)
-    yield
-    Base.metadata.drop_all(bind=pg_engine)
 
 
 @pytest.fixture
