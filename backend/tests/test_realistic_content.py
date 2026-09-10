@@ -478,20 +478,15 @@ class TestRealisticContent:
 
         # Complete all items across all phases
         all_items = items["pre_flight"] + items["execution"] + items["verification"]
-        hold_point_ids = set()
 
         for i, item_data in enumerate(all_items):
-            # Check if this is a hold point from our definition
+            # Verify hold points BEFORE completion (two-person rule, before the step runs)
             if item_data.get("is_hold_point"):
-                hold_point_ids.add(item_data["id"])
-
-            # If previous item was a hold point, verify it first
-            if i > 0 and all_items[i - 1]["id"] in hold_point_ids:
-                prev_id = all_items[i - 1]["id"]
-                client.post(
-                    f"/api/v1/changes/{change_id}/checklist/{prev_id}/hold-point-verify",
+                resp = client.post(
+                    f"/api/v1/changes/{change_id}/checklist/{item_data['id']}/hold-point-verify",
                     json={"verified_by": "Senior Engineer"},
                 )
+                assert resp.status_code == 200, f"Failed to verify hold point: {resp.json()}"
 
             resp = client.post(
                 f"/api/v1/changes/{change_id}/checklist/{item_data['id']}/complete",
@@ -510,13 +505,6 @@ class TestRealisticContent:
             assert resp.status_code == 200, (
                 f"Failed to complete item {i + 1} ({item_data['description'][:60]}): {resp.json()}"
             )
-
-        # Verify the last hold point (in verification phase)
-        last_hold = [i for i in all_items if i["id"] in hold_point_ids][-1]
-        client.post(
-            f"/api/v1/changes/{change_id}/checklist/{last_hold['id']}/hold-point-verify",
-            json={"verified_by": "Senior Engineer"},
-        )
 
         # Check execution status — all done
         resp = client.get(f"/api/v1/changes/{change_id}/execution-status")
