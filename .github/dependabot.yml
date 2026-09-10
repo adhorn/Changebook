@@ -52,3 +52,8 @@ updates:
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 2
+    ignore:
+      # Track Node LTS only; odd-numbered majors (25, 27, ...) are not LTS.
+      # Bump the major by hand when moving to the next LTS.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
