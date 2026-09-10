@@ -125,7 +125,27 @@ alembic revision --autogenerate -m "describe the change"
 alembic upgrade head
 ```
 
-CI runs `alembic check` and fails the PR if a model change has no matching migration. Note that the test suite uses `create_all()` for speed, so **tests will not catch a missing migration** — `alembic check` is the guard.
+CI runs `alembic check` and fails the PR if a model change has no matching migration.
+
+The test suite constructs its schema by running `alembic upgrade head` once per session, then truncates tables between tests. This means unit tests exercise the same schema-construction path the backend uses on startup — so a migration that diverges from the models will surface in test failures as well as in `alembic check`.
+
+#### What `alembic check` catches and what it doesn't
+
+The coverage is empirically verified by `tests/test_alembic_check_coverage.py`.
+
+**Caught** — `alembic check` will fail the PR if any of these are missing a migration:
+
+- Columns added to or removed from a model
+- Column type changes (e.g. `String(255)` → `Text`)
+- Nullability flips (`nullable=True` ↔ `nullable=False`)
+- Indexes added to or removed from a model
+
+**Known carve-outs** — these need a hand-written migration; autogenerate will not flag a missing one:
+
+- **CHECK constraint additions or changes.** If you add `CheckConstraint(...)` to a model, write the migration explicitly with `op.create_check_constraint(...)`.
+- **PostgreSQL enum value additions.** If you add a value to a `StrEnum` used by a column, write the migration explicitly with `op.execute("ALTER TYPE <enum> ADD VALUE '<value>'")`.
+
+If you find a third class that slips through, add a test for it in `tests/test_alembic_check_coverage.py` and append it to this list.
 
 ## Reporting bugs
 
