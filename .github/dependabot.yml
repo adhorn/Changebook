@@ -22,6 +22,13 @@ updates:
       interval: "monthly"
     open-pull-requests-limit: 5
     versioning-strategy: "increase-if-necessary"
+    ignore:
+      # eslint 10 removed context.getFilename() and friends. eslint-plugin-react
+      # (pulled in by eslint-config-next, latest 7.37.5 as of 2026-09) still
+      # uses them and crashes at lint time. Re-enable once eslint-config-next
+      # ships plugins that declare eslint ^10 in their peer range. See #56.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor-patch:
         update-types:
