@@ -44,8 +44,15 @@ class ChecklistItem(UUIDMixin, TimestampMixin, Base):
     expected_outcome: Mapped[str | None] = mapped_column(Text, nullable=True)
     rollback_action: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # Hold point: execution pauses here until independent verification
+    # Hold point: execution pauses here for second-person verification
+    # BEFORE the step can run. The item cannot be completed until verified.
     is_hold_point: Mapped[bool] = mapped_column(default=False, nullable=False)
+
+    # Hold point verification (by a second person, before completion)
+    hold_point_verified_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    hold_point_verified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     # Deviation tracking: was this step added during execution?
     added_during_execution: Mapped[bool] = mapped_column(default=False, nullable=False)
@@ -77,12 +84,6 @@ class ChecklistCompletion(UUIDMixin, TimestampMixin, Base):
     # Who completed it
     completed_by: Mapped[str] = mapped_column(String(255), nullable=False)
     completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-
-    # Hold point verification (by a second person)
-    hold_point_verified_by: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    hold_point_verified_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
 
     # Relationships
     item: Mapped["ChecklistItem"] = relationship(back_populates="completion")
