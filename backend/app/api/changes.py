@@ -432,6 +432,7 @@ def complete_checklist_item(
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
 
     item = change_service.get_checklist_item(db, change_id, item_id)
     if not item:
@@ -445,7 +446,7 @@ def complete_checklist_item(
 
 @router.post(
     "/{change_id}/checklist/{item_id}/hold-point-verify",
-    response_model=ChecklistCompletionResponse,
+    response_model=ChecklistItemResponse,
 )
 def verify_hold_point(
     change_id: uuid.UUID,
@@ -457,21 +458,19 @@ def verify_hold_point(
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    # The executor (author) is at the keyboard and types the verifier's
+    # name. The verifier doesn't log in themselves — the honor-system
+    # applies to the content, not the caller.
+    _require_author(user, change)
 
     item = change_service.get_checklist_item(db, change_id, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Checklist item not found")
 
-    # Two-person rule: verifier name must be different from completer
-    if item.completion and item.completion.completed_by == payload.verified_by:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Hold point must be verified by a different person "
-            f"than the one who completed the item ({item.completion.completed_by}).",
-        )
-
-    completion = execution_service.verify_hold_point(db, change, item, payload.verified_by)
-    return completion
+    # Two-person rule is enforced at completion time (the completer must
+    # differ from the verifier). At verify time the completer is unknown.
+    item = execution_service.verify_hold_point(db, change, item, payload.verified_by)
+    return item
 
 
 @router.post(
@@ -489,6 +488,7 @@ def add_execution_step(
     change = change_service.get_change(db, change_id)
     if not change:
         raise HTTPException(status_code=404, detail="Change not found")
+    _require_author(user, change)
 
     insert_after_item = change_service.get_checklist_item(
         db, change_id, payload.insert_after_item_id

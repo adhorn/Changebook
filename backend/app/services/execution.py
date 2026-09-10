@@ -61,13 +61,12 @@ def _is_item_completed(item: ChecklistItem) -> bool:
 
 
 def _is_phase_complete(items: list[ChecklistItem]) -> bool:
-    """Check if all items in a phase are completed (and hold points verified)."""
-    for item in items:
-        if not _is_item_completed(item):
-            return False
-        if item.is_hold_point and item.completion.hold_point_verified_by is None:
-            return False
-    return True
+    """Check if all items in a phase are completed.
+
+    Hold points are verified BEFORE completion (the complete_item gate blocks
+    completion without verification), so completion existence is sufficient.
+    """
+    return all(_is_item_completed(item) for item in items)
 
 
 def complete_item(
@@ -85,7 +84,9 @@ def complete_item(
     - Item hasn't already been completed
     - All preceding items in the same phase are done
     - All items in preceding phases are done (phase gating)
-    - Previous hold points are verified
+    - If item is a hold point, it must be verified BEFORE completion,
+      and the completer must be a different person than the verifier
+      (two-person rule)
     """
     # Gate: change must be executing
     if change.status != ChangeStatus.EXECUTING:
@@ -97,6 +98,21 @@ def complete_item(
     # Gate: item not already completed
     if _is_item_completed(item):
         raise ConflictError(f"Item '{item.description}' has already been completed.")
+
+    # Gate: hold point must be verified before completion
+    if item.is_hold_point and item.hold_point_verified_by is None:
+        raise GateError(
+            f"Cannot complete '{item.description}' — this is a hold point. "
+            "A second person must verify before the step can run."
+        )
+
+    # Gate: two-person rule — completer must differ from verifier
+    if item.is_hold_point and item.hold_point_verified_by == completed_by:
+        raise GateError(
+            f"Cannot complete '{item.description}' — the completer "
+            f"must be a different person than the verifier "
+            f"({item.hold_point_verified_by})."
+        )
 
     all_items = _get_ordered_items(db, change.id)
     by_phase = _items_by_phase(all_items)
@@ -122,15 +138,6 @@ def complete_item(
                 f"Cannot complete this item out of order. "
                 f"Item '{preceding_item.description}' (order {preceding_item.order}) "
                 f"must be completed first."
-            )
-        # Check hold point on preceding item
-        if (
-            preceding_item.is_hold_point
-            and preceding_item.completion.hold_point_verified_by is None
-        ):
-            raise GateError(
-                f"Cannot proceed — hold point on '{preceding_item.description}' "
-                f"has not been verified. A second person must verify before continuing."
             )
 
     # Create completion record
@@ -184,13 +191,13 @@ def verify_hold_point(
     change: Change,
     item: ChecklistItem,
     verified_by: str,
-) -> ChecklistCompletion:
-    """Verify a hold point — requires a second person.
+) -> ChecklistItem:
+    """Verify a hold point — requires a second person, BEFORE the step runs.
 
     Validates:
     - Change is in executing status
     - Item is a hold point
-    - Item has been completed (you verify after completion, not before)
+    - Item has NOT been completed yet (verification gates completion, not the other way around)
     - Hold point hasn't already been verified
     """
     if change.status != ChangeStatus.EXECUTING:
@@ -199,20 +206,19 @@ def verify_hold_point(
     if not item.is_hold_point:
         raise ValidationError(f"Item '{item.description}' is not a hold point.")
 
-    if not _is_item_completed(item):
-        raise GateError(
-            f"Cannot verify hold point — item '{item.description}' has not been completed yet."
+    if _is_item_completed(item):
+        raise ConflictError(
+            f"Cannot verify hold point — item '{item.description}' has already been completed."
         )
 
-    completion = item.completion
-    if completion.hold_point_verified_by is not None:
+    if item.hold_point_verified_by is not None:
         raise ConflictError(
             f"Hold point on '{item.description}' has already been verified "
-            f"by {completion.hold_point_verified_by}."
+            f"by {item.hold_point_verified_by}."
         )
 
-    completion.hold_point_verified_by = verified_by
-    completion.hold_point_verified_at = datetime.now(UTC)
+    item.hold_point_verified_by = verified_by
+    item.hold_point_verified_at = datetime.now(UTC)
 
     audit = AuditEvent(
         change_id=change.id,
@@ -230,7 +236,7 @@ def verify_hold_point(
     )
     db.add(audit)
     db.commit()
-    db.refresh(completion)
+    db.refresh(item)
     logger.info(
         "Hold point verified: %s [%s/%d]",
         item.description,
@@ -243,7 +249,7 @@ def verify_hold_point(
             "detail": f"phase={item.phase.value} order={item.order}",
         },
     )
-    return completion
+    return item
 
 
 def get_execution_status(db: Session, change: Change) -> dict:
@@ -286,12 +292,6 @@ def get_execution_status(db: Session, change: Change) -> dict:
                 if not _is_item_completed(item):
                     next_item_id = str(item.id)
                     break
-                # Check if it's a hold point waiting for verification
-                if item.is_hold_point and item.completion.hold_point_verified_by is None:
-                    # Next action is to verify this hold point, but the
-                    # "next_item_id" points to the next uncompleted item
-                    # (or this hold point if no further items need completion)
-                    pass
             break
 
     all_complete = completed == total and next_item_id is None
