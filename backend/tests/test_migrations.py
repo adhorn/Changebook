@@ -43,11 +43,19 @@ def _drop_everything(engine):
 
 @pytest.fixture
 def migration_engine():
-    """Provide a clean database engine for migration tests."""
+    """Provide a clean database engine for migration tests.
+
+    On teardown the canonical schema is restored (Alembic to head) so
+    later tests in the same session find the schema intact — the
+    session-scoped fixture in conftest only builds the schema once.
+    """
     engine = create_engine(SQLALCHEMY_TEST_URL)
     _drop_everything(engine)
     yield engine
     _drop_everything(engine)
+    # Restore the canonical schema for the rest of the session
+    cfg = _alembic_config()
+    command.upgrade(cfg, "head")
     engine.dispose()
 
 

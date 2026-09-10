@@ -148,18 +148,18 @@ class TestFullChangeLifecycle:
         # 6b. Complete all checklist items before marking done
         items = client.get(f"/api/v1/changes/{change_id}/checklist").json()
         for item in items:
-            resp = client.post(
-                f"/api/v1/changes/{change_id}/checklist/{item['id']}/complete",
-                json={"observed_result": "OK", "status": "completed"},
-            )
-            assert resp.status_code == 200, f"Failed to complete item: {resp.json()}"
-            # Verify hold points so subsequent items can proceed
+            # Verify hold points BEFORE the step can be completed
             if item.get("is_hold_point"):
                 resp = client.post(
                     f"/api/v1/changes/{change_id}/checklist/{item['id']}/hold-point-verify",
                     json={"verified_by": "Second Person"},
                 )
                 assert resp.status_code == 200, f"Failed to verify hold point: {resp.json()}"
+            resp = client.post(
+                f"/api/v1/changes/{change_id}/checklist/{item['id']}/complete",
+                json={"observed_result": "OK", "status": "completed"},
+            )
+            assert resp.status_code == 200, f"Failed to complete item: {resp.json()}"
 
         resp = client.post(
             f"/api/v1/changes/{change_id}/transition",
