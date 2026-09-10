@@ -31,7 +31,7 @@ jobs:
       CHANGEBOOK_DATABASE_URL: postgresql://changebook:changebook@localhost:5432/changebook_test
       CHANGEBOOK_TEST_DATABASE_URL: postgresql://changebook:changebook@localhost:5432/changebook_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
@@ -63,7 +63,7 @@ jobs:
       CHANGEBOOK_DATABASE_URL: postgresql://changebook:changebook@localhost:5432/changebook_test
       CHANGEBOOK_TEST_DATABASE_URL: postgresql://changebook:changebook@localhost:5432/changebook_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
@@ -94,7 +94,7 @@ jobs:
     env:
       CHANGEBOOK_DATABASE_URL: postgresql://changebook:changebook@localhost:5432/changebook_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
@@ -114,7 +114,7 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
@@ -130,7 +130,7 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
@@ -160,7 +160,7 @@ jobs:
     env:
       CHANGEBOOK_DATABASE_URL: postgresql://changebook:changebook@localhost:5432/changebook_test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v6
         with:
           python-version: "3.14"
@@ -200,7 +200,7 @@ jobs:
       matrix:
         image: [backend, frontend]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
       # Build only, no push. This exists so Dependabot base-image bumps
       # (python:*-slim, node:*-alpine) and Dockerfile edits are actually
