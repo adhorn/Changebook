@@ -205,7 +205,7 @@ jobs:
       # Build only, no push. This exists so Dependabot base-image bumps
       # (python:*-slim, node:*-alpine) and Dockerfile edits are actually
       # exercised; the other jobs run on the GitHub runner, not in the image.
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.image }}
           push: false
