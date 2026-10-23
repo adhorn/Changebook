@@ -14,9 +14,11 @@ authors = [
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
-    "sqlalchemy>=2.0.25",
+    # SQLAlchemy 2.1 made psycopg 3 the default driver for plain postgresql://
+    # URLs, so the two floors move together.
+    "sqlalchemy>=2.1",
     "alembic>=1.13.0",
-    "psycopg2-binary>=2.9.9",
+    "psycopg[binary]>=3.2",
     "pydantic>=2.5.0",
     "pydantic-settings>=2.1.0",
     "python-multipart>=0.0.6",
